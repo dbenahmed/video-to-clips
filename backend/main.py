@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.core.config import STORAGE_DIR, CORS_ORIGINS
 from app.routers.video import router as video_router
+from app.routers.pipeline import router as pipeline_router
 
 # ==============================================================================
 # OpenAPI Tags Metadata (Shown prominently in Swagger UI at /docs)
@@ -22,6 +23,13 @@ tags_metadata = [
             "Endpoints responsible for getting video content into the system. "
             "Supports **Direct Multipart File Uploads** and **Automated YouTube Video Downloads** via `yt-dlp`. "
             "All ingested files are assigned a collision-resistant UUID and saved inside the dedicated `storage/uploads/` directory."
+        ),
+    },
+    {
+        "name": "Pipeline",
+        "description": (
+            "The core AI engine. Exposes endpoints to trigger the full **Semantic Video Segmentation** "
+            "and **Hybrid Subject Tracking** algorithms on uploaded videos. Highly configurable."
         ),
     },
     {
@@ -44,15 +52,17 @@ Welcome to the **Video-to-Clips** backend specification.
 
 This API serves as the engine for turning raw horizontal videos into engaging **9:16 vertical shorts and clips**.
 
-### 🌟 Current Capabilities (Milestones 1 & 2):
+### 🌟 Current Capabilities (Milestones 1, 2 & 3):
 * **Direct Video File Uploads**: Upload `.mp4`, `.mov`, `.avi`, `.mkv`, and `.webm` files safely with chunk-based disk writes.
 * **YouTube Ingestion**: Provide any public YouTube URL to download the highest-quality MP4 stream automatically using `yt-dlp`.
 * **UUID Isolation**: Every video receives a globally unique session ID to prevent collisions.
 * **Direct Media Streaming**: Ingested files are immediately accessible via the mounted `/storage` route for instant browser playback.
+* **Semantic Video Segmentation**: AI-powered transcription and topic clustering to extract 30-60s golden clips.
+* **Hybrid Subject Tracking**: MediaPipe + OpenCV tracking to keep the subject centered in 9:16 vertical crops.
 
-### 🛣️ Next Up (Milestone 3):
-* Audio silence & scene detection for intelligent clip timestamp generation.
-* OpenCV/MediaPipe subject tracking for dynamic 9:16 camera following.
+### 🛣️ Next Up (Frontend Integration):
+* Build out the React UI to consume the `/api/v1/pipeline/process` endpoint.
+* Implement a loading screen for the pipeline processing.
     """,
     version="1.0.0",
     openapi_tags=tags_metadata,
@@ -86,6 +96,7 @@ app.mount(
 # 4. Router Registration
 # ==============================================================================
 app.include_router(video_router)
+app.include_router(pipeline_router)
 
 
 # ==============================================================================
