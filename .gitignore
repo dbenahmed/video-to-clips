@@ -16,3 +16,8 @@ frontend/dist/
 # Logs & temp files
 *.log
 .DS_Store
+
+# Video & Pipeline Testing
+*.mp4
+*.tflite
+backend/tests/pipeline_playground/output/

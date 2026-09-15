@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zero-CPU Tracking Preview</title>
+    <style>
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background: #1e1e2f; 
+            color: #ffffff; 
+            padding: 30px; 
+            margin: 0;
+        }
+        h1 { margin-top: 0; color: #00ffcc; }
+        p { color: #aaaaaa; }
+        
+        .container { 
+            display: flex; 
+            gap: 40px; 
+            margin-top: 20px; 
+            flex-wrap: wrap;
+        }
+        
+        /* The Video Container */
+        .video-wrapper { 
+            position: relative; 
+            display: inline-block; 
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            background: #000;
+        }
+        video { 
+            max-width: 800px; 
+            display: block;
+        }
+        
+        /* The glowing 9:16 CSS overlay box */
+        .crop-box {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            /* 9:16 ratio width will be calculated dynamically via JS */
+            width: 30%; 
+            border: 4px solid #00ffcc;
+            box-shadow: 0 0 20px rgba(0, 255, 204, 0.6), inset 0 0 20px rgba(0, 255, 204, 0.3);
+            pointer-events: none; /* Let clicks pass right through to the video player */
+            transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1); /* Creates the smooth "panning" effect */
+            box-sizing: border-box;
+            background: rgba(0, 255, 204, 0.05); /* Very faint tint */
+        }
+
+        /* Controls Panel */
+        .controls { 
+            flex: 1;
+            min-width: 300px;
+            max-width: 500px;
+            background: #2a2a40;
+            padding: 20px;
+            border-radius: 12px;
+        }
+        textarea { 
+            width: 100%; 
+            height: 350px; 
+            background: #181825; 
+            color: #00ffcc; 
+            border: 1px solid #3a3a5a; 
+            padding: 15px; 
+            font-family: monospace; 
+            border-radius: 8px;
+            resize: vertical;
+            box-sizing: border-box;
+        }
+        button { 
+            background: #00ffcc; 
+            color: #1e1e2f; 
+            border: none; 
+            padding: 12px 24px; 
+            cursor: pointer; 
+            font-weight: bold; 
+            margin-top: 15px; 
+            border-radius: 6px;
+            width: 100%;
+            font-size: 16px;
+            transition: background 0.2s;
+        }
+        button:hover { background: #00ccaa; }
+        #status {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 6px;
+            text-align: center;
+            background: rgba(255,255,255,0.05);
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Zero-CPU Tracking Preview</h1>
+    <p>Watch how the frontend uses purely CSS to smoothly pan the camera based on the compressed backend JSON.</p>
+    
+    <div class="container">
+        
+        <!-- Left: The Video Player -->
+        <div class="video-wrapper">
+            <!-- Loads the local sample.mp4 automatically -->
+            <video id="myVideo" src="sample.mp4" controls muted></video>
+            
+            <!-- This is the 9:16 bounding box! -->
+            <div id="cropBox" class="crop-box"></div>
+        </div>
+        
+        <!-- Right: The Data Injector -->
+        <div class="controls">
+            <h3>1. Paste your `recipe.json` here:</h3>
+            <textarea id="jsonInput">{
+    "global_tracking": []
+}</textarea>
+            <button onclick="loadTrackingData()">Apply Tracking Data</button>
+            <div id="status">No data loaded yet.</div>
+        </div>
+        
+    </div>
+
+    <script>
+        const video = document.getElementById('myVideo');
+        const cropBox = document.getElementById('cropBox');
+        let trackingData = [];
+        let videoWidth = 0;
+        let videoHeight = 0;
+        let scaleFactor = 1;
+
+        // When the browser loads the video file, calculate the 9:16 box size
+        video.addEventListener('loadedmetadata', () => {
+            videoWidth = video.videoWidth;   // True width (e.g., 1920)
+            videoHeight = video.videoHeight; // True height (e.g., 1080)
+            
+            // A 9:16 crop is 9/16ths of the height.
+            const targetCropWidth = videoHeight * (9/16);
+            
+            // Calculate how much the browser has shrunk the video to fit the screen
+            scaleFactor = video.clientWidth / videoWidth;
+            
+            // Apply the exact scaled width to our CSS box
+            cropBox.style.width = `${targetCropWidth * scaleFactor}px`;
+        });
+
+        // Parse the JSON pasted by the user
+        function loadTrackingData() {
+            try {
+                const rawJson = document.getElementById('jsonInput').value;
+                const parsed = JSON.parse(rawJson);
+                
+                if (parsed.global_tracking) {
+                    trackingData = parsed.global_tracking;
+                    const statusEl = document.getElementById('status');
+                    statusEl.innerText = `Success! Loaded ${trackingData.length} tracking blocks. Play the video!`;
+                    statusEl.style.color = "#00ffcc";
+                    statusEl.style.background = "rgba(0, 255, 204, 0.1)";
+                } else {
+                    alert("JSON must contain a 'global_tracking' array.");
+                }
+            } catch (e) {
+                alert("Invalid JSON format. Make sure you copied the whole file!");
+            }
+        }
+
+        // =======================================================================
+        // THE ZERO-CPU UPDATE LOOP
+        // =======================================================================
+        // This fires 2-4 times a second as the video plays.
+        video.addEventListener('timeupdate', () => {
+            if (trackingData.length === 0) return;
+            
+            const currentTime = video.currentTime;
+            
+            // Find the specific Time Range block that matches the current second
+            const activeBlock = trackingData.find(block => 
+                currentTime >= block.start_time_seconds && currentTime <= block.end_time_seconds
+            );
+
+            if (activeBlock) {
+                // We have the center X coordinate. We need the Left Edge coordinate for CSS.
+                // Left Edge = Center X - (Crop Width / 2)
+                const cropWidthPixels = videoHeight * (9/16);
+                let leftEdgePixels = activeBlock.center_x_coordinate - (cropWidthPixels / 2);
+                
+                // Security Constraint: Don't let the box slide off the edge of the video
+                if (leftEdgePixels < 0) leftEdgePixels = 0;
+                if (leftEdgePixels + cropWidthPixels > videoWidth) {
+                    leftEdgePixels = videoWidth - cropWidthPixels;
+                }
+
+                // Convert true video pixels into shrunk HTML pixels
+                const finalTranslateX = leftEdgePixels * scaleFactor;
+                
+                // The Magic: Hardware-accelerated CSS movement. No heavy canvas redrawing!
+                cropBox.style.transform = `translateX(${finalTranslateX}px)`;
+            }
+        });
+        
+        // Recalculate sizes if the user resizes the browser window
+        window.addEventListener('resize', () => {
+             scaleFactor = video.clientWidth / videoWidth;
+             const targetCropWidth = videoHeight * (9/16);
+             cropBox.style.width = `${targetCropWidth * scaleFactor}px`;
+        });
+    </script>
+</body>
+</html>

@@ -14,17 +14,16 @@ This is our step-by-step plan for building the application. We will tackle these
 * **Backend:** Create an endpoint using `yt-dlp` to download a video given a YouTube URL.
 * **Frontend:** Build a premium, user-friendly UI with a drag-and-drop zone and a URL input field.
 
-## 🧠 Milestone 3: The "Brain" (Analysis & Tracking)
-*Goal: Analyze the video to find clips and track the subject.*
-* **Backend (Segmentation):** Implement the modular segmentation logic (Algorithm TBD: Audio silence, scene detection, or fixed chunks) to generate initial start/end times.
-* **Backend (Tracking):** Use OpenCV/MediaPipe to scan the video and calculate the dynamic X/Y coordinates needed to keep the subject centered in a 9:16 vertical frame.
-* **API:** Send this "recipe" (list of clips with timestamps and crop coordinates) to the frontend.
+## 🧠 Milestone 3: The "Brain" (Decoupled Global Tracking & Segmentation)
+*Goal: Analyze the video to independently generate clip boundaries and a global tracking map.*
+* **Backend (Global Tracker):** Implement a fast, downsampled face tracker (e.g., MediaPipe at 2 fps) across the *entire* video, compressing the results into independent Time Ranges (`[start, end, x, y]`).
+* **Backend (Segmentation):** Implement a modular segmentation logic (mocked randomly for now) to generate proposed clip boundaries (start/end).
+* **API (The Recipe):** Deliver the `global_tracking` map and the `clips` arrays independently so the frontend has full timeline control.
 
 ## 🎛️ Milestone 4: Interactive Video Timeline (UI/UX)
-*Goal: Let the user review and edit the AI's suggestions.*
-* **Frontend:** Build a custom video player.
-* **Frontend (Timeline):** Create an interactive slider where users can see the auto-generated clips, drag the edges to adjust times, or delete clips they don't want.
-* **Frontend (Preview):** Draw a visual 9:16 bounding box over the video player so the user can preview exactly what the final cropped video will look like.
+*Goal: Let the user review and freely edit the AI's suggestions without breaking tracking.*
+* **Frontend (Timeline & Editor):** Create an interactive slider where users can drag the edges of auto-generated clips to extend/shorten them seamlessly.
+* **Frontend (Zero-CPU Preview):** Build a custom video player that plays the horizontal video while applying a CSS `transform` overlay to a 9:16 bounding box. The box automatically reads the `global_tracking` map to pan smoothly as the video plays.
 
 ## ⚙️ Milestone 5: The "Brawn" (Cropping & Export)
 *Goal: Do the heavy lifting to create the final video files.*
