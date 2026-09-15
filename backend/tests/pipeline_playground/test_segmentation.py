@@ -172,8 +172,14 @@ class TranscriptionEngine:
         """Runs Whisper and parses the raw segments into our TranscribedSentence DTO."""
         print("Transcribing audio...")
         
-        # We set vad_filter=True to ignore silent parts of the audio
-        segments, info = self.whisper_model.transcribe(str(audio_file_path), vad_filter=True)
+        # PERFORMANCE OPTIMIZATIONS:
+        # 1. vad_filter=True: Skips silent parts of the audio.
+        # 2. beam_size=1: Greedy decoding (massively speeds up transcription by not exploring alternate guesses).
+        segments, info = self.whisper_model.transcribe(
+            str(audio_file_path), 
+            vad_filter=True,
+            beam_size=1,
+        )
         
         parsed_sentences: List[TranscribedSentence] = []
         
@@ -243,8 +249,9 @@ class SemanticAnalyzer:
         # We extract just the text to pass to the AI
         texts_to_embed = [sentence.text_content for sentence in sentences]
         
-        # The AI returns a matrix of vectors (one vector per sentence)
-        vectors = self.embedding_model.encode(texts_to_embed)
+        # PERFORMANCE OPTIMIZATION: 
+        # Using batch_size=32 allows the GPU to process 32 sentences simultaneously.
+        vectors = self.embedding_model.encode(texts_to_embed, batch_size=32)
         
         for index, sentence in enumerate(sentences):
             sentence.semantic_embedding = vectors[index]
@@ -453,7 +460,8 @@ class ClipExtractor:
 def run_segmentation_pipeline() -> None:
     """The master function that wires all modules together."""
     
-    current_directory: Path = Path(__file__).parent
+    # Fallback to current working directory (cwd) if running in Jupyter/Colab
+    current_directory: Path = Path(__file__).parent if '__file__' in globals() else Path.cwd()
     sample_video_path: Path = current_directory / "sample.mp4"
     audio_wav_path: Path = current_directory / "temp_audio.wav"
     output_json_path: Path = current_directory / "segmentation_recipe.json"
