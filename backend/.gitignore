@@ -1,0 +1,16 @@
+# Python virtual environment
+venv/
+.venv/
+env/
+
+# Python cache & artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Storage directory (uploaded & processed videos)
+storage/
+
+# Environment files
+.env

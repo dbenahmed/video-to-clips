@@ -1,1 +1,18 @@
-.vscode
+# IDE & Editor files
+.vscode/
+.idea/
+
+# Backend
+backend/venv/
+backend/.venv/
+backend/storage/
+backend/__pycache__/
+backend/*.pyc
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+# Logs & temp files
+*.log
+.DS_Store
