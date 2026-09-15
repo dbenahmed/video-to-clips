@@ -13,6 +13,12 @@
   padding: 2.5rem 1.5rem;
 }
 
+/* Allow the editor page to stretch full-width */
+.main-content:has(.editor-page-root) {
+  max-width: 100%;
+  padding: 0;
+}
+
 /* Glassmorphic Cards */
 .glass-panel {
   background: var(--bg-card);

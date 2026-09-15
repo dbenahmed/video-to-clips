@@ -99,9 +99,14 @@ export default function PipelineOptionsPage() {
               ))
             )}
           </div>
-          <button className="btn-secondary" style={{ marginTop: '2rem' }} onClick={() => navigate('/')}>
-            Start Over
-          </button>
+          <div style={{ marginTop: '2rem', display: 'flex', gap: '1rem' }}>
+            <button className="btn-primary" onClick={() => navigate(`/editor/${encodeURIComponent(savedFilename)}`)}>
+              Proceed to Video Editor 🎬
+            </button>
+            <button className="btn-secondary" onClick={() => navigate('/')}>
+              Start Over
+            </button>
+          </div>
         </div>
       </div>
     );
