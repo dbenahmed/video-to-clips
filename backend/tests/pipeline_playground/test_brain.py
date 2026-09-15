@@ -71,7 +71,8 @@ class TrackingDataCompressor:
                       
     This turns 36,000 frames into maybe 50 logical blocks, saving massive amounts of data!
     """
-    def __init__(self, pixel_movement_threshold: int = 10):
+    # TODO: RESTORE - Revert pixel_movement_threshold to 10 for accurate production tracking
+    def __init__(self, pixel_movement_threshold: int = 50):
         # The maximum number of pixels the subject can move left or right before we 
         # decide they have "moved" and a brand new time block needs to be created.
         self.pixel_movement_threshold: int = pixel_movement_threshold
@@ -246,7 +247,8 @@ class HybridVideoTracker:
 # MAIN PIPELINE EXECUTION
 # ============================================================================
 
-def run_hybrid_tracking_pipeline(target_frames_per_second: int = 15) -> None:
+# TODO: RESTORE - Revert target_frames_per_second to 15 for smooth production tracking
+def run_hybrid_tracking_pipeline(target_frames_per_second: int = 1) -> None:
     """
     The main orchestrator function. Reads the video, passes frames to the Hybrid Tracker,
     compresses the data, and outputs the final JSON recipe.
@@ -352,4 +354,5 @@ def run_hybrid_tracking_pipeline(target_frames_per_second: int = 15) -> None:
 
 
 if __name__ == "__main__":
-    run_hybrid_tracking_pipeline(target_frames_per_second=15)
+    # TODO: RESTORE - Revert target_frames_per_second to 15
+    run_hybrid_tracking_pipeline(target_frames_per_second=1)
