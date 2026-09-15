@@ -265,6 +265,13 @@ def run_hybrid_tracking_pipeline(target_frames_per_second: int = 1) -> None:
     print("\n[1/4] Initializing Video Capture...")
     video_capture_instance = cv2.VideoCapture(str(sample_video_file_path))
     
+    if not video_capture_instance.isOpened() or int(video_capture_instance.get(cv2.CAP_PROP_FRAME_COUNT)) <= 0:
+        print(f"Error: OpenCV could not read '{sample_video_file_path.name}'.")
+        print("The file appears to be corrupted, empty, or not a valid video format.")
+        print("Solution: Please replace it with a real, working MP4 video file.")
+        video_capture_instance.release()
+        return
+    
     # Extract metadata needed for calculations
     video_metadata = VideoMetadata(
         total_frames=int(video_capture_instance.get(cv2.CAP_PROP_FRAME_COUNT)),

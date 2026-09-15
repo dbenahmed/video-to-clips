@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Segmentation Tester</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --panel-bg: rgba(30, 41, 59, 0.7);
+            --accent-color: #3b82f6;
+            --accent-hover: #2563eb;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --border-color: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            margin: 0;
+            padding: 2rem;
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-color);
+            background-image: radial-gradient(circle at 15% 50%, rgba(59, 130, 246, 0.15), transparent 25%),
+                              radial-gradient(circle at 85% 30%, rgba(139, 92, 246, 0.15), transparent 25%);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 1rem;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin: 0;
+            background: linear-gradient(135deg, #60a5fa, #a78bfa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .controls {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            align-items: center;
+            background: var(--panel-bg);
+            padding: 1rem 2rem;
+            border-radius: 1rem;
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--border-color);
+            width: fit-content;
+            margin: 0 auto;
+        }
+
+        .file-input-wrapper {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .file-input-wrapper label {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-muted);
+        }
+
+        input[type="file"] {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 0.5rem;
+            border-radius: 0.5rem;
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            outline: none;
+            cursor: pointer;
+        }
+        
+        input[type="file"]::file-selector-button {
+            background: var(--accent-color);
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 0.25rem;
+            color: white;
+            cursor: pointer;
+            margin-right: 1rem;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+
+        input[type="file"]::file-selector-button:hover {
+            background: var(--accent-hover);
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 400px;
+            gap: 2rem;
+            max-width: 1400px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .video-container {
+            background: var(--panel-bg);
+            border-radius: 1rem;
+            padding: 1rem;
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        video {
+            width: 100%;
+            border-radius: 0.5rem;
+            background: black;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        .video-info {
+            display: flex;
+            justify-content: space-between;
+            color: var(--text-muted);
+            font-size: 0.875rem;
+        }
+
+        .clips-container {
+            background: var(--panel-bg);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+
+        /* Custom Scrollbar */
+        .clips-container::-webkit-scrollbar {
+            width: 8px;
+        }
+        .clips-container::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 4px;
+        }
+        .clips-container::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+        }
+
+        .clips-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+            position: sticky;
+            top: 0;
+            background: var(--bg-color); /* To hide scrolling items */
+            padding-bottom: 1rem;
+            z-index: 10;
+        }
+        
+        .clips-header h2 {
+            margin: 0;
+            font-size: 1.25rem;
+        }
+        
+        .badge {
+            background: rgba(59, 130, 246, 0.2);
+            color: #60a5fa;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .clip-card {
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--border-color);
+            border-radius: 0.75rem;
+            padding: 1rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .clip-card:hover {
+            border-color: var(--accent-color);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
+        .clip-card.active {
+            border-color: var(--accent-color);
+            background: rgba(59, 130, 246, 0.1);
+        }
+
+        .clip-card.active::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            background: var(--accent-color);
+        }
+
+        .clip-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .clip-title {
+            font-weight: 600;
+            color: var(--text-main);
+        }
+
+        .clip-time {
+            font-size: 0.875rem;
+            color: var(--accent-color);
+            background: rgba(59, 130, 246, 0.1);
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+        }
+
+        .clip-transcript {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            margin-bottom: 0.5rem;
+        }
+
+        .clip-reasoning {
+            font-size: 0.75rem;
+            color: #a78bfa;
+            font-style: italic;
+        }
+
+        .empty-state {
+            text-align: center;
+            color: var(--text-muted);
+            padding: 3rem 1rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .empty-state svg {
+            width: 48px;
+            height: 48px;
+            opacity: 0.5;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>Segmentation Tester</h1>
+        <p style="color: var(--text-muted)">Preview golden clips extracted by the AI pipeline</p>
+    </div>
+
+    <div class="controls">
+        <div class="file-input-wrapper">
+            <label for="videoInput">1. Load Video (sample.mp4)</label>
+            <input type="file" id="videoInput" accept="video/mp4,video/webm,video/quicktime">
+        </div>
+        <div class="file-input-wrapper">
+            <label for="jsonInput">2. Load Results (segmentation_recipe.json)</label>
+            <input type="file" id="jsonInput" accept=".json">
+        </div>
+    </div>
+
+    <div class="main-content">
+        <div class="video-container">
+            <video id="videoPlayer" controls>
+                Your browser does not support the video tag.
+            </video>
+            <div class="video-info">
+                <span id="currentStatus">Waiting for files...</span>
+                <span id="activeClipInfo">No clip selected</span>
+            </div>
+        </div>
+
+        <div class="clips-container">
+            <div class="clips-header" style="background: transparent;">
+                <h2>Extracted Clips</h2>
+                <span class="badge" id="clipCount">0</span>
+            </div>
+            
+            <div id="clipsList">
+                <div class="empty-state">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <span>Load a JSON recipe to see clips</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const videoInput = document.getElementById('videoInput');
+        const jsonInput = document.getElementById('jsonInput');
+        const videoPlayer = document.getElementById('videoPlayer');
+        const clipsList = document.getElementById('clipsList');
+        const clipCount = document.getElementById('clipCount');
+        const currentStatus = document.getElementById('currentStatus');
+        const activeClipInfo = document.getElementById('activeClipInfo');
+
+        let activeClip = null;
+        let stopTime = null;
+
+        // Load Video File
+        videoInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const fileURL = URL.createObjectURL(file);
+                videoPlayer.src = fileURL;
+                currentStatus.textContent = `Loaded: ${file.name}`;
+            }
+        });
+
+        // Format seconds into MM:SS
+        function formatTime(seconds) {
+            const m = Math.floor(seconds / 60);
+            const s = Math.floor(seconds % 60);
+            return `${m}:${s.toString().padStart(2, '0')}`;
+        }
+
+        // Load JSON Recipe
+        jsonInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    try {
+                        const data = JSON.parse(event.target.result);
+                        renderClips(data.clips || []);
+                    } catch (error) {
+                        alert('Error parsing JSON file. Make sure it is valid.');
+                        console.error(error);
+                    }
+                };
+                reader.readAsText(file);
+            }
+        });
+
+        function renderClips(clips) {
+            if (clips.length === 0) {
+                clipsList.innerHTML = '<div class="empty-state">No clips found in JSON.</div>';
+                clipCount.textContent = '0';
+                return;
+            }
+
+            clipCount.textContent = clips.length;
+            clipsList.innerHTML = '';
+
+            clips.forEach((clip, index) => {
+                const card = document.createElement('div');
+                card.className = 'clip-card';
+                card.id = `clip-card-${clip.clip_id}`;
+                
+                const startTimeFmt = formatTime(clip.start_time_seconds);
+                const endTimeFmt = formatTime(clip.end_time_seconds);
+                const durationFmt = clip.duration_seconds.toFixed(1);
+
+                card.innerHTML = `
+                    <div class="clip-header">
+                        <span class="clip-title">Clip ${index + 1}</span>
+                        <span class="clip-time">${startTimeFmt} - ${endTimeFmt} (${durationFmt}s)</span>
+                    </div>
+                    <div class="clip-transcript">${clip.text_transcript}</div>
+                    <div class="clip-reasoning">✨ ${clip.extraction_reasoning}</div>
+                `;
+
+                card.addEventListener('click', () => playClip(clip));
+                clipsList.appendChild(card);
+            });
+        }
+
+        function playClip(clip) {
+            // Remove active class from all
+            document.querySelectorAll('.clip-card').forEach(c => c.classList.remove('active'));
+            // Add active class to clicked
+            const activeCard = document.getElementById(`clip-card-${clip.clip_id}`);
+            if(activeCard) activeCard.classList.add('active');
+
+            activeClipInfo.textContent = `Playing: Clip ${clip.clip_id} (${clip.duration_seconds.toFixed(1)}s)`;
+            
+            videoPlayer.currentTime = clip.start_time_seconds;
+            stopTime = clip.end_time_seconds;
+            activeClip = clip;
+            videoPlayer.play();
+        }
+
+        // Auto-pause when clip ends
+        videoPlayer.addEventListener('timeupdate', () => {
+            if (activeClip && stopTime && videoPlayer.currentTime >= stopTime) {
+                videoPlayer.pause();
+                stopTime = null; // Prevent re-triggering until another clip is clicked
+                activeClipInfo.textContent = `Finished: Clip ${activeClip.clip_id}`;
+            }
+        });
+
+    </script>
+</body>
+</html>

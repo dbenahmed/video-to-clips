@@ -21,3 +21,5 @@ frontend/dist/
 *.mp4
 *.tflite
 backend/tests/pipeline_playground/output/
+backend/tests/pipeline_playground/*.json
+backend/tests/pipeline_playground/*.wav

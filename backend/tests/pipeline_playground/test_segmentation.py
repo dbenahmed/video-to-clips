@@ -117,20 +117,35 @@ class AudioExtractor:
             
         print(f"Extracting audio to {output_wav_path.name}...")
         
+        try:
+            import imageio_ffmpeg
+            ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
+        except ImportError:
+            ffmpeg_exe = "ffmpeg"  # Fallback to system ffmpeg
+        
         # FFmpeg command: -y (overwrite), -vn (no video), -acodec pcm_s16le (WAV format), 
         # -ar 16000 (16kHz sample rate), -ac 1 (mono channel)
         ffmpeg_command = [
-            "ffmpeg", "-y", "-i", str(video_file_path),
+            ffmpeg_exe, "-y", "-i", str(video_file_path),
             "-vn", "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1",
             str(output_wav_path)
         ]
         
         try:
-            # We use DEVNULL to hide the massive wall of FFmpeg logs
-            subprocess.run(ffmpeg_command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+            # Capture output so we can inspect errors if it fails
+            result = subprocess.run(ffmpeg_command, capture_output=True, text=True, check=True)
             return True
-        except subprocess.CalledProcessError:
-            print("Error: FFmpeg extraction failed. Is FFmpeg installed on your system?")
+        except subprocess.CalledProcessError as e:
+            if "moov atom not found" in e.stderr or "Invalid data found" in e.stderr:
+                print(f"Error: The video file '{video_file_path.name}' is corrupted or not a valid MP4.")
+                print("Solution: Please replace it with a real, working video file.")
+            else:
+                print("Error: FFmpeg extraction failed.")
+                print(f"Details: {e.stderr.strip()[-200:]}")
+            return False
+        except FileNotFoundError:
+            print("Error: FFmpeg executable not found!")
+            print("Solution: Run `pip install imageio-ffmpeg` in your terminal to automatically download the FFmpeg binary.")
             return False
 
 
@@ -142,33 +157,59 @@ class TranscriptionEngine:
     """Responsibility: Convert audio into grammatically correct sentences with timestamps."""
     
     def __init__(self, model_size: str = "base"):
-        # We load the Whisper model. 'base' is fast and highly accurate for English.
         print(f"Loading Whisper model ({model_size})...")
-        self.whisper_model = WhisperModel(model_size, device="cpu", compute_type="int8")
+        try:
+            # Attempt to load on GPU (CUDA) for blazing fast transcription
+            self.whisper_model = WhisperModel(model_size, device="cuda", compute_type="float16")
+            print("✨ SUCCESS: NVIDIA GPU (CUDA) detected! Transcription will be lightning fast.")
+        except Exception:
+            # Fallback to CPU if they don't have an NVIDIA card (e.g. Intel UHD graphics, Macbooks)
+            print("⚠️  NOTE: No NVIDIA GPU detected. Falling back to CPU.")
+            print("    Transcription will take significantly longer on a standard processor.")
+            self.whisper_model = WhisperModel(model_size, device="cpu", compute_type="int8")
 
     def transcribe_audio_to_sentences(self, audio_file_path: Path) -> List[TranscribedSentence]:
         """Runs Whisper and parses the raw segments into our TranscribedSentence DTO."""
-        print("Transcribing audio (this may take a moment)...")
+        print("Transcribing audio...")
         
         # We set vad_filter=True to ignore silent parts of the audio
-        segments, _ = self.whisper_model.transcribe(str(audio_file_path), vad_filter=True)
+        segments, info = self.whisper_model.transcribe(str(audio_file_path), vad_filter=True)
         
         parsed_sentences: List[TranscribedSentence] = []
+        
+        try:
+            from tqdm import tqdm
+        except ImportError:
+            print("Tip: Run `pip install tqdm` to see a nice progress bar!")
+            # Dummy tqdm fallback
+            class tqdm:
+                def __init__(self, **kwargs): pass
+                def __enter__(self): return self
+                def __exit__(self, *args): pass
+                def update(self, *args): pass
         
         # Note: Whisper natively attempts to group text by punctuation into "segments".
         # For this playground, we will trust Whisper's default segmentation as sentences.
         # In production, we might want to iterate word-by-word and strictly look for "." or "?".
-        for segment in segments:
-            clean_text = segment.text.strip()
-            if not clean_text:
-                continue
+        
+        with tqdm(total=round(info.duration, 2), unit="sec", desc="Transcription", leave=True) as pbar:
+            previous_end_time = 0.0
+            for segment in segments:
+                clean_text = segment.text.strip()
+                if not clean_text:
+                    continue
+                    
+                sentence_obj = TranscribedSentence(
+                    text_content=clean_text,
+                    start_time_seconds=segment.start,
+                    end_time_seconds=segment.end
+                )
+                parsed_sentences.append(sentence_obj)
                 
-            sentence_obj = TranscribedSentence(
-                text_content=clean_text,
-                start_time_seconds=segment.start,
-                end_time_seconds=segment.end
-            )
-            parsed_sentences.append(sentence_obj)
+                # Update progress bar
+                increment = round(segment.end - previous_end_time, 2)
+                pbar.update(increment)
+                previous_end_time = segment.end
             
         # EXAMPLE OUTPUT OF THIS STEP:
         # [
@@ -439,8 +480,13 @@ def run_segmentation_pipeline() -> None:
         mapper = TopicBlockMapper(similarity_drop_threshold=0.3)
         blocks = mapper.map_sentences_to_blocks(sentences)
         
-        # 5. Extract Gold
-        miner = ClipExtractor(min_duration_sec=30.0, max_duration_sec=60.0)
+        print(f"\n--- DEBUG: FOUND {len(blocks)} TOPIC BLOCKS ---")
+        for b in blocks:
+            print(f"  Block {b.block_id}: {b.duration_seconds:.1f} seconds")
+        print("------------------------------------------\n")
+        
+        # 5. Extract Gold (Lowered to 10s for testing)
+        miner = ClipExtractor(min_duration_sec=10.0, max_duration_sec=90.0)
         golden_clips = miner.extract_golden_clips(blocks)
         
         # 6. Export Results
