@@ -9,6 +9,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import IngestionPage from './pages/IngestionPage';
+import PipelineOptionsPage from './pages/PipelineOptionsPage';
 import NotFoundPage from './pages/NotFoundPage';
 import './App.css';
 
@@ -20,6 +21,7 @@ export default function App() {
         <main className="main-content">
           <Routes>
             <Route path="/" element={<IngestionPage />} />
+            <Route path="/pipeline/:savedFilename" element={<PipelineOptionsPage />} />
             {/* Future milestones can easily add:
                 <Route path="/editor/:id" element={<EditorPage />} />
                 <Route path="/export/:id" element={<ExportPage />} />

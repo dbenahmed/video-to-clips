@@ -6,10 +6,12 @@
  */
 
 import React, { useState } from 'react';
-import { getFullVideoUrl } from '../services/api';
+import { useNavigate } from 'react-router-dom';
+import { getFullVideoUrl } from '../services/videoApi';
 
 export default function VideoResultCard({ videoData, onReset }) {
   const [copied, setCopied] = useState(false);
+  const navigate = useNavigate();
   const streamUrl = getFullVideoUrl(videoData.url);
 
   const formatBytes = (bytes) => {
@@ -103,7 +105,7 @@ export default function VideoResultCard({ videoData, onReset }) {
 
         <button
           className="btn-primary"
-          onClick={() => alert('Ready for Milestone 3: AI Subject Tracking & Segmentation!')}
+          onClick={() => navigate(`/pipeline/${encodeURIComponent(videoData.saved_filename)}`)}
         >
           <span>Proceed to Milestone 3: AI Analysis</span>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

@@ -6,7 +6,7 @@
  */
 
 import React, { useState, useRef } from 'react';
-import { uploadVideoFile } from '../services/api';
+import { uploadVideoFile } from '../services/videoApi';
 
 const ALLOWED_EXTENSIONS = ['.mp4', '.mov', '.avi', '.mkv', '.webm'];
 

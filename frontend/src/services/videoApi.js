@@ -1,35 +1,4 @@
-/**
- * Centralized API Service
- * =======================
- * - Isolates all HTTP network communication,
- *   endpoint path management, and Axios configuration in one module.
- * - Base URL, header defaults, and response normalization
- *   are maintained here rather than scattered throughout React components.
- */
-
-import axios from 'axios';
-
-// Backend base URL (can be customized via Vite environment variables if needed)
-export const BACKEND_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
-
-const apiClient = axios.create({
-  baseURL: BACKEND_URL,
-  timeout: 600000, // 10 minutes timeout for heavy video uploads/downloads
-});
-
-/**
- * Checks connectivity with the FastAPI backend.
- * @returns {Promise<{ online: boolean, message?: string }>}
- */
-export async function checkBackendHealth() {
-  try {
-    const response = await apiClient.get('/api/test');
-    return { online: true, message: response.data.message };
-  } catch (error) {
-    console.warn('Backend health check failed:', error.message);
-    return { online: false, message: error.message };
-  }
-}
+import { apiClient, BACKEND_URL } from './apiClient';
 
 /**
  * Uploads a local video file with upload progress tracking.

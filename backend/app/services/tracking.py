@@ -109,7 +109,7 @@ class HybridVideoTracker:
         return self.video_metadata.video_width_pixels // 2, self.video_metadata.video_height_pixels // 2
 
 
-def run_tracking(video_path: Path, options: TrackingOptions) -> List[dict]:
+def run_tracking(video_path: Path, options: TrackingOptions, progress_callback=None) -> List[dict]:
     """Runs the hybrid tracking algorithm on the video."""
     capture = cv2.VideoCapture(str(video_path))
     
@@ -135,6 +135,10 @@ def run_tracking(video_path: Path, options: TrackingOptions) -> List[dict]:
             current_time = current_frame_index / metadata.frames_per_second
             cx, cy = tracker.process_frame(frame_bgr)
             compressor.add_data_point(current_time, cx, cy)
+            
+        if current_frame_index % 10 == 0 and progress_callback:
+            progress = min(99.0, (current_frame_index / metadata.total_frames) * 100.0)
+            progress_callback(progress)
             
         current_frame_index += 1
         

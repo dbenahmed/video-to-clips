@@ -72,7 +72,7 @@ class TranscriptionEngine:
         except Exception:
             self.whisper_model = WhisperModel(model_size, device="cpu", compute_type="int8")
 
-    def transcribe_audio_to_sentences(self, audio_file_path: Path) -> List[TranscribedSentence]:
+    def transcribe_audio_to_sentences(self, audio_file_path: Path, progress_callback=None) -> List[TranscribedSentence]:
         segments, info = self.whisper_model.transcribe(
             str(audio_file_path), 
             vad_filter=True,
@@ -90,6 +90,10 @@ class TranscriptionEngine:
                 start_time_seconds=segment.start,
                 end_time_seconds=segment.end
             ))
+            if progress_callback and info.duration > 0:
+                progress = min(99.0, (segment.end / info.duration) * 100.0)
+                progress_callback(progress)
+                
         return parsed_sentences
 
 
@@ -205,7 +209,7 @@ class ClipExtractor:
         return extracted_clips
 
 
-def run_segmentation(video_path: Path, options: SegmentationOptions) -> List[dict]:
+def run_segmentation(video_path: Path, options: SegmentationOptions, progress_callback=None) -> List[dict]:
     """Runs the full segmentation pipeline and returns a list of dictionaries matching ClipResponse schema."""
     audio_wav_path = video_path.parent / f"{video_path.stem}_audio.wav"
     
@@ -213,7 +217,7 @@ def run_segmentation(video_path: Path, options: SegmentationOptions) -> List[dic
         AudioExtractor.extract_wav_from_mp4(video_path, audio_wav_path)
         
         transcriber = TranscriptionEngine(model_size=options.whisper_model_size)
-        sentences = transcriber.transcribe_audio_to_sentences(audio_wav_path)
+        sentences = transcriber.transcribe_audio_to_sentences(audio_wav_path, progress_callback)
         
         analyzer = SemanticAnalyzer()
         analyzer.embed_sentences(sentences)

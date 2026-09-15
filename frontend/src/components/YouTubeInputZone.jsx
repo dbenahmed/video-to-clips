@@ -5,7 +5,7 @@
  */
 
 import React, { useState } from 'react';
-import { downloadYouTubeVideo } from '../services/api';
+import { downloadYouTubeVideo } from '../services/videoApi';
 
 export default function YouTubeInputZone({ onDownloadSuccess }) {
   const [url, setUrl] = useState('');

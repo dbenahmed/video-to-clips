@@ -37,6 +37,10 @@ class PipelineProcessRequest(BaseModel):
         ..., 
         description="The exact 'saved_filename' returned by the /upload or /download-youtube endpoint."
     )
+    skip_segmentation: bool = Field(
+        default=False,
+        description="If true, bypasses the Whisper transcription entirely and only returns tracking data."
+    )
     segmentation_options: SegmentationOptions = Field(
         default_factory=SegmentationOptions,
         description="User-defined tweaks for how the AI segments the video."

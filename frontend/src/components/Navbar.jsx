@@ -5,7 +5,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { checkBackendHealth } from '../services/api';
+import { checkBackendHealth } from '../services/apiClient';
 
 export default function Navbar() {
   const [isOnline, setIsOnline] = useState(null);
