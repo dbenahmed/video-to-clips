@@ -68,6 +68,13 @@ export default function EditorPage() {
   
   const activeClip = clips.find(c => c.id === activeClipId) || clips[0];
 
+  // Add Custom Clip Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalTitle, setModalTitle] = useState('');
+  const [modalStartTime, setModalStartTime] = useState(0);
+  const [modalEndTime, setModalEndTime] = useState(30);
+  const [modalText, setModalText] = useState('');
+
   // Timeline Drag-to-Scroll State
   const timelineRef = useRef(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -253,8 +260,59 @@ export default function EditorPage() {
     }
   };
 
+  const handleTextChange = (val, field) => {
+    setClips(clips.map(c => c.id === activeClipId ? { ...c, [field]: val } : c));
+  };
+
+  const openAddClipModal = () => {
+    const startSec = Math.floor(currentVideoTime * 10) / 10;
+    const endSec = Math.floor(Math.min(currentVideoTime + 30, videoDuration || currentVideoTime + 30) * 10) / 10;
+    setModalTitle(`Custom Clip ${clips.length + 1}`);
+    setModalStartTime(startSec);
+    setModalEndTime(endSec);
+    setModalText(`Custom clip from ${startSec}s to ${endSec}s`);
+    setIsModalOpen(true);
+  };
+
+  const handleCreateClipFromModal = (e) => {
+    e.preventDefault();
+    const startNum = parseFloat(modalStartTime) || 0;
+    const endNum = parseFloat(modalEndTime) || startNum + 5;
+    
+    const newClipId = `clip_${Date.now()}`;
+    const newClip = {
+      id: newClipId,
+      start_time: Math.max(0, startNum),
+      end_time: Math.min(videoDuration || endNum, Math.max(startNum + 0.5, endNum)),
+      title: modalTitle || `Custom Clip ${clips.length + 1}`,
+      text: modalText || "User created custom clip."
+    };
+
+    setClips(prev => [...prev, newClip]);
+    setActiveClipId(newClipId);
+    setIsModalOpen(false);
+
+    if (videoRef.current) {
+      videoRef.current.currentTime = newClip.start_time;
+    }
+  };
+
+  const handleDeleteClip = (clipIdToDelete) => {
+    if (clips.length <= 1) {
+      alert("At least one clip must remain in the project.");
+      return;
+    }
+
+    const updatedClips = clips.filter(c => c.id !== clipIdToDelete);
+    setClips(updatedClips);
+
+    if (activeClipId === clipIdToDelete) {
+      setActiveClipId(updatedClips[0].id);
+    }
+  };
+
   const handleExport = async (clipToExport) => {
-    const tempId = `temp_${Date.now()}`;
+    const tempId = `temp_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     
     setExportJobs(prev => ({
       ...prev,
@@ -306,6 +364,12 @@ export default function EditorPage() {
         [tempId]: { ...prev[tempId], status: 'error', error: error.message }
       }));
     }
+  };
+
+  const handleExportAll = () => {
+    clips.forEach(clip => {
+      handleExport(clip);
+    });
   };
 
   const handleCancelExport = async (exportId) => {
@@ -426,14 +490,122 @@ export default function EditorPage() {
         </div>
       )}
 
+      {/* Add Custom Clip Modal */}
+      {isModalOpen && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(5, 8, 15, 0.85)',
+          backdropFilter: 'blur(10px)',
+          WebkitBackdropFilter: 'blur(10px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 10000,
+          padding: '1rem'
+        }}>
+          <div className="glass-panel" style={{ width: '100%', maxWidth: '500px', padding: '2rem', border: '1px solid rgba(0, 255, 204, 0.4)', boxShadow: '0 0 30px rgba(0, 255, 204, 0.15)' }}>
+            <h3 style={{ color: '#fff', marginTop: 0, marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span style={{ color: '#00ffcc' }}>🎬</span> Add New Custom Clip
+            </h3>
+            
+            <form onSubmit={handleCreateClipFromModal} style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
+              <div>
+                <label style={{ display: 'block', color: '#ccc', marginBottom: '0.4rem', fontSize: '0.9rem' }}>
+                  Clip Title
+                </label>
+                <input 
+                  type="text" 
+                  required
+                  value={modalTitle} 
+                  onChange={(e) => setModalTitle(e.target.value)}
+                  placeholder="e.g. Action Intro, Key Highlight"
+                  style={{ width: '100%', padding: '0.75rem', background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', borderRadius: '8px', fontSize: '0.95rem', boxSizing: 'border-box' }} 
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', color: '#ccc', marginBottom: '0.4rem', fontSize: '0.9rem' }}>
+                    Start Time (s)
+                  </label>
+                  <input 
+                    type="number" 
+                    step="0.1"
+                    min="0"
+                    max={videoDuration}
+                    required
+                    value={modalStartTime} 
+                    onChange={(e) => setModalStartTime(e.target.value)}
+                    style={{ width: '100%', padding: '0.75rem', background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.2)', color: '#00ffcc', borderRadius: '8px', fontSize: '1rem', fontWeight: 'bold', boxSizing: 'border-box' }} 
+                  />
+                </div>
+                
+                <div>
+                  <label style={{ display: 'block', color: '#ccc', marginBottom: '0.4rem', fontSize: '0.9rem' }}>
+                    End Time (s)
+                  </label>
+                  <input 
+                    type="number" 
+                    step="0.1"
+                    min="0"
+                    max={videoDuration}
+                    required
+                    value={modalEndTime} 
+                    onChange={(e) => setModalEndTime(e.target.value)}
+                    style={{ width: '100%', padding: '0.75rem', background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.2)', color: '#00ffcc', borderRadius: '8px', fontSize: '1rem', fontWeight: 'bold', boxSizing: 'border-box' }} 
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', color: '#ccc', marginBottom: '0.4rem', fontSize: '0.9rem' }}>
+                  Description / Notes
+                </label>
+                <textarea 
+                  rows="3"
+                  value={modalText} 
+                  onChange={(e) => setModalText(e.target.value)}
+                  placeholder="Notes or details about this custom clip..."
+                  style={{ width: '100%', padding: '0.75rem', background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.2)', color: '#aaa', borderRadius: '8px', fontSize: '0.9rem', resize: 'vertical', boxSizing: 'border-box' }} 
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '0.5rem' }}>
+                <button 
+                  type="button" 
+                  className="btn-secondary" 
+                  onClick={() => setIsModalOpen(false)}
+                  style={{ padding: '0.6rem 1.2rem' }}
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit" 
+                  className="btn-primary" 
+                  style={{ padding: '0.6rem 1.4rem' }}
+                >
+                  Create Clip
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
         <h2>Interactive Clip Editor <span style={{ color: '#00ffcc' }}>🎬</span></h2>
-        <button className="btn-secondary" onClick={() => navigate('/')}>
-          ⬅️ Back to Pipeline
-        </button>
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+          <button className="btn-secondary" onClick={() => navigate('/')}>
+            ⬅️ Back to Pipeline
+          </button>
+        </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 350px', gap: '2rem', flex: 1, minHeight: 0 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 370px', gap: '2rem', flex: 1, minHeight: 0 }}>
         
         {/* LEFT COLUMN: Zero-CPU Preview Player */}
         <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', minHeight: 0, minWidth: 0 }}>
@@ -494,25 +666,54 @@ export default function EditorPage() {
             onMouseLeave={() => setIsDragging(false)}
           >
             <div 
-              style={{ width: `${Math.max(100, videoDuration * 4)}px`, minWidth: '100%', height: '50px', position: 'relative', flexShrink: 0 }}
+              style={{ width: `${Math.max(100, videoDuration * 4)}px`, minWidth: '100%', height: '54px', position: 'relative', flexShrink: 0 }}
               onClick={(e) => handleTimelineClick(e, videoDuration)}
             >
-            {/* The active clip highlighted region */}
-            <div style={{
-              position: 'absolute',
-              left: `${(activeClip.start_time / videoDuration) * 100}%`,
-              width: `${((activeClip.end_time - activeClip.start_time) / videoDuration) * 100}%`,
-              height: '100%',
-              background: 'rgba(0, 255, 204, 0.3)',
-              borderLeft: '2px solid #00ffcc',
-              borderRight: '2px solid #00ffcc',
-              pointerEvents: 'none',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
-              <span style={{ color: '#00ffcc', fontSize: '0.8rem', fontWeight: 'bold', textShadow: '0 0 5px #000' }}>Active Clip</span>
-            </div>
+              {/* Render regions for ALL clips on the visual timeline */}
+              {clips.map(clip => {
+                const isActive = clip.id === activeClipId;
+                const leftPct = (clip.start_time / videoDuration) * 100;
+                const widthPct = ((clip.end_time - clip.start_time) / videoDuration) * 100;
+
+                return (
+                  <div 
+                    key={clip.id}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setActiveClipId(clip.id);
+                      if (videoRef.current) videoRef.current.currentTime = clip.start_time;
+                    }}
+                    style={{
+                      position: 'absolute',
+                      left: `${leftPct}%`,
+                      width: `${widthPct}%`,
+                      height: '100%',
+                      background: isActive ? 'rgba(0, 255, 204, 0.35)' : 'rgba(168, 85, 247, 0.25)',
+                      borderLeft: `2px solid ${isActive ? '#00ffcc' : '#c084fc'}`,
+                      borderRight: `2px solid ${isActive ? '#00ffcc' : '#c084fc'}`,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      overflow: 'hidden',
+                      zIndex: isActive ? 5 : 2,
+                      transition: 'background 0.2s, border-color 0.2s'
+                    }}
+                    title={`${clip.title} (${clip.start_time.toFixed(1)}s - ${clip.end_time.toFixed(1)}s)`}
+                  >
+                    <span style={{ 
+                      color: isActive ? '#00ffcc' : '#e9d5ff', 
+                      fontSize: '0.75rem', 
+                      fontWeight: 'bold', 
+                      textShadow: '0 0 5px #000',
+                      whiteSpace: 'nowrap',
+                      padding: '0 4px'
+                    }}>
+                      {clip.title}
+                    </span>
+                  </div>
+                );
+              })}
             
               {/* Playhead */}
               <div style={{
@@ -530,16 +731,16 @@ export default function EditorPage() {
           </div>
 
           <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem', flexShrink: 0 }}>
-            <button className="btn-secondary" style={{ flex: 1, padding: '0.8rem', fontSize: '1rem', border: '1px solid rgba(0, 255, 204, 0.5)', color: '#00ffcc', fontWeight: 'bold' }} onClick={() => handleNumberChange(currentVideoTime, 'start_time')}>
+            <button className="btn-secondary" style={{ flex: 1, padding: '0.8rem', fontSize: '0.95rem', border: '1px solid rgba(0, 255, 204, 0.5)', color: '#00ffcc', fontWeight: 'bold' }} onClick={() => handleNumberChange(currentVideoTime, 'start_time')}>
                ⬅️ Set Start Here
             </button>
-            <button className="btn-secondary" style={{ flex: 1, padding: '0.8rem', fontSize: '1rem', border: '1px solid rgba(0, 255, 204, 0.5)', color: '#00ffcc', fontWeight: 'bold' }} onClick={() => handleNumberChange(currentVideoTime, 'end_time')}>
+            <button className="btn-secondary" style={{ flex: 1, padding: '0.8rem', fontSize: '0.95rem', border: '1px solid rgba(0, 255, 204, 0.5)', color: '#00ffcc', fontWeight: 'bold' }} onClick={() => handleNumberChange(currentVideoTime, 'end_time')}>
                Set End Here ➡️
             </button>
           </div>
 
-          <div style={{ marginTop: '0.5rem', display: 'flex', justifyContent: 'space-between', color: '#888', fontSize: '0.9rem', flexShrink: 0 }}>
-            <span>Click timeline to jump. Use buttons to lock bounds.</span>
+          <div style={{ marginTop: '0.5rem', display: 'flex', justifyContent: 'space-between', color: '#888', fontSize: '0.85rem', flexShrink: 0 }}>
+            <span>Click timeline to seek. Click clip block to select.</span>
             <span>Video remains completely unedited on disk.</span>
           </div>
         </div>
@@ -548,107 +749,170 @@ export default function EditorPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           
           {/* Active Clip Editor Panel */}
-          <div className="glass-panel" style={{ padding: '1.5rem', flexShrink: 0 }}>
-            <h3 style={{ color: '#fff', marginBottom: '1rem' }}>Editing: <span style={{ color: '#00ffcc' }}>{activeClip.title}</span></h3>
-            
-            <p style={{ color: '#aaa', fontSize: '0.95rem', fontStyle: 'italic', marginBottom: '1.5rem', background: 'rgba(0,0,0,0.3)', padding: '1rem', borderRadius: '8px' }}>
-              "{activeClip.text}"
-            </p>
-
-            <div style={{ marginBottom: '1.5rem' }}>
-              <label style={{ display: 'block', color: '#ccc', marginBottom: '0.5rem' }}>
-                Start Time (seconds)
-              </label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <button className="btn-secondary" style={{ padding: '0.5rem', flexShrink: 0, fontSize: '0.9rem' }} onClick={() => handleNumberChange(activeClip.start_time - 0.5, 'start_time')}>-0.5s</button>
-                <input 
-                  type="number" 
-                  step="0.1" 
-                  min="0"
-                  value={activeClip.start_time} 
-                  onChange={(e) => handleNumberChange(e.target.value, 'start_time')}
-                  style={{ flex: 1, minWidth: 0, padding: '0.6rem', background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.2)', color: '#00ffcc', borderRadius: '8px', fontSize: '1rem', textAlign: 'center', fontWeight: 'bold' }} 
-                />
-                <button className="btn-secondary" style={{ padding: '0.5rem', flexShrink: 0, fontSize: '0.9rem' }} onClick={() => handleNumberChange(activeClip.start_time + 0.5, 'start_time')}>+0.5s</button>
-              </div>
-            </div>
-
-            <div style={{ marginBottom: '2rem' }}>
-              <label style={{ display: 'block', color: '#ccc', marginBottom: '0.5rem' }}>
-                End Time (seconds)
-              </label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <button className="btn-secondary" style={{ padding: '0.5rem', flexShrink: 0, fontSize: '0.9rem' }} onClick={() => handleNumberChange(activeClip.end_time - 0.5, 'end_time')}>-0.5s</button>
-                <input 
-                  type="number" 
-                  step="0.1" 
-                  min="0"
-                  value={activeClip.end_time} 
-                  onChange={(e) => handleNumberChange(e.target.value, 'end_time')}
-                  style={{ flex: 1, minWidth: 0, padding: '0.6rem', background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.2)', color: '#00ffcc', borderRadius: '8px', fontSize: '1rem', textAlign: 'center', fontWeight: 'bold' }} 
-                />
-                <button className="btn-secondary" style={{ padding: '0.5rem', flexShrink: 0, fontSize: '0.9rem' }} onClick={() => handleNumberChange(activeClip.end_time + 0.5, 'end_time')}>+0.5s</button>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1.5rem' }}>
-              <span style={{ color: '#888' }}>
-                Duration: <strong>{(activeClip.end_time - activeClip.start_time).toFixed(1)}s</strong>
-              </span>
-              <button className="btn-primary" onClick={() => handleExport(activeClip)} style={{ padding: '0.6rem 1.2rem' }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '0.5rem', display: 'inline' }}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                Export Clip
-              </button>
-            </div>
-          </div>
-
-          {/* Clips List */}
-          <div className="glass-panel" style={{ padding: '1.5rem', flex: 1, overflowY: 'auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h3 style={{ color: '#fff', margin: 0, fontSize: '1.1rem' }}>Clips</h3>
-              <button 
-                className="btn-secondary" 
-                style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}
-                onClick={() => {
-                  const newClipId = `clip_${Date.now()}`;
-                  const newClip = {
-                    id: newClipId,
-                    start_time: currentVideoTime,
-                    end_time: Math.min(currentVideoTime + 30, videoDuration || currentVideoTime + 30),
-                    title: `Custom Clip ${clips.length + 1}`,
-                    text: "Manually created clip."
-                  };
-                  setClips([...clips, newClip]);
-                  setActiveClipId(newClipId);
-                }}
-              >
-                + Add Clip
-              </button>
-            </div>
-            
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
-              {clips.map(clip => (
-                <div 
-                  key={clip.id} 
-                  onClick={() => setActiveClipId(clip.id)}
-                  style={{ 
-                    padding: '1rem', 
-                    background: activeClipId === clip.id ? 'rgba(0, 255, 204, 0.1)' : 'rgba(255,255,255,0.03)', 
-                    border: `1px solid ${activeClipId === clip.id ? '#00ffcc' : 'rgba(255,255,255,0.1)'}`,
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s'
-                  }}
+          {activeClip && (
+            <div className="glass-panel" style={{ padding: '1.5rem', flexShrink: 0 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <span style={{ color: '#00ffcc', fontSize: '0.8rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Editing Active Clip
+                </span>
+                <button 
+                  className="btn-secondary" 
+                  style={{ padding: '3px 8px', fontSize: '0.75rem', borderColor: '#ef4444', color: '#ef4444' }}
+                  onClick={() => handleDeleteClip(activeClip.id)}
+                  title="Delete this clip"
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                    <strong style={{ color: activeClipId === clip.id ? '#00ffcc' : '#eee' }}>{clip.title}</strong>
-                    <span style={{ color: '#888', fontSize: '0.85rem' }}>{(clip.end_time - clip.start_time).toFixed(1)}s</span>
-                  </div>
-                  <div style={{ color: '#aaa', fontSize: '0.85rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {clip.text}
-                  </div>
+                  🗑️ Delete
+                </button>
+              </div>
+
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ display: 'block', color: '#ccc', marginBottom: '0.3rem', fontSize: '0.85rem' }}>
+                  Clip Title
+                </label>
+                <input 
+                  type="text" 
+                  value={activeClip.title} 
+                  onChange={(e) => handleTextChange(e.target.value, 'title')}
+                  style={{ width: '100%', padding: '0.6rem', background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(0, 255, 204, 0.3)', color: '#fff', borderRadius: '8px', fontSize: '1rem', fontWeight: 'bold', boxSizing: 'border-box' }}
+                />
+              </div>
+              
+              <div style={{ marginBottom: '1.2rem' }}>
+                <label style={{ display: 'block', color: '#ccc', marginBottom: '0.3rem', fontSize: '0.85rem' }}>
+                  Notes / Transcript
+                </label>
+                <textarea 
+                  rows="2"
+                  value={activeClip.text} 
+                  onChange={(e) => handleTextChange(e.target.value, 'text')}
+                  style={{ width: '100%', padding: '0.6rem', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: '#aaa', borderRadius: '8px', fontSize: '0.85rem', resize: 'vertical', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              <div style={{ marginBottom: '1.2rem' }}>
+                <label style={{ display: 'block', color: '#ccc', marginBottom: '0.4rem', fontSize: '0.85rem' }}>
+                  Start Time (seconds)
+                </label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <button className="btn-secondary" style={{ padding: '0.5rem', flexShrink: 0, fontSize: '0.85rem' }} onClick={() => handleNumberChange(activeClip.start_time - 0.5, 'start_time')}>-0.5s</button>
+                  <input 
+                    type="number" 
+                    step="0.1" 
+                    min="0"
+                    value={activeClip.start_time} 
+                    onChange={(e) => handleNumberChange(e.target.value, 'start_time')}
+                    style={{ flex: 1, minWidth: 0, padding: '0.5rem', background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.2)', color: '#00ffcc', borderRadius: '8px', fontSize: '0.95rem', textAlign: 'center', fontWeight: 'bold' }} 
+                  />
+                  <button className="btn-secondary" style={{ padding: '0.5rem', flexShrink: 0, fontSize: '0.85rem' }} onClick={() => handleNumberChange(activeClip.start_time + 0.5, 'start_time')}>+0.5s</button>
                 </div>
-              ))}
+              </div>
+
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label style={{ display: 'block', color: '#ccc', marginBottom: '0.4rem', fontSize: '0.85rem' }}>
+                  End Time (seconds)
+                </label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <button className="btn-secondary" style={{ padding: '0.5rem', flexShrink: 0, fontSize: '0.85rem' }} onClick={() => handleNumberChange(activeClip.end_time - 0.5, 'end_time')}>-0.5s</button>
+                  <input 
+                    type="number" 
+                    step="0.1" 
+                    min="0"
+                    value={activeClip.end_time} 
+                    onChange={(e) => handleNumberChange(e.target.value, 'end_time')}
+                    style={{ flex: 1, minWidth: 0, padding: '0.5rem', background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.2)', color: '#00ffcc', borderRadius: '8px', fontSize: '0.95rem', textAlign: 'center', fontWeight: 'bold' }} 
+                  />
+                  <button className="btn-secondary" style={{ padding: '0.5rem', flexShrink: 0, fontSize: '0.85rem' }} onClick={() => handleNumberChange(activeClip.end_time + 0.5, 'end_time')}>+0.5s</button>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1.2rem' }}>
+                <span style={{ color: '#888', fontSize: '0.85rem' }}>
+                  Duration: <strong style={{ color: '#fff' }}>{(activeClip.end_time - activeClip.start_time).toFixed(1)}s</strong>
+                </span>
+                <button className="btn-primary" onClick={() => handleExport(activeClip)} style={{ padding: '0.6rem 1.2rem' }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '0.5rem', display: 'inline' }}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                  Export Clip
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Clips List Panel */}
+          <div className="glass-panel" style={{ padding: '1.5rem', flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h3 style={{ color: '#fff', margin: 0, fontSize: '1.1rem' }}>
+                Clips ({clips.length})
+              </h3>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button 
+                  className="btn-secondary" 
+                  style={{ padding: '0.4rem 0.7rem', fontSize: '0.8rem', border: '1px solid rgba(0, 255, 204, 0.4)', color: '#00ffcc' }}
+                  onClick={openAddClipModal}
+                >
+                  + Add Clip
+                </button>
+                <button 
+                  className="btn-primary" 
+                  style={{ padding: '0.4rem 0.7rem', fontSize: '0.8rem' }}
+                  onClick={handleExportAll}
+                  title="Export all clips in list concurrently"
+                >
+                  Export All
+                </button>
+              </div>
+            </div>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', flex: 1, overflowY: 'auto' }}>
+              {clips.map(clip => {
+                const isActive = activeClipId === clip.id;
+                return (
+                  <div 
+                    key={clip.id} 
+                    onClick={() => setActiveClipId(clip.id)}
+                    style={{ 
+                      padding: '1rem', 
+                      background: isActive ? 'rgba(0, 255, 204, 0.1)' : 'rgba(255,255,255,0.03)', 
+                      border: `1px solid ${isActive ? '#00ffcc' : 'rgba(255,255,255,0.1)'}`,
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      position: 'relative'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                      <strong style={{ color: isActive ? '#00ffcc' : '#eee', fontSize: '0.95rem' }}>{clip.title}</strong>
+                      <span style={{ color: '#888', fontSize: '0.85rem' }}>{(clip.end_time - clip.start_time).toFixed(1)}s</span>
+                    </div>
+                    
+                    <div style={{ color: '#aaa', fontSize: '0.85rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginBottom: '0.6rem' }}>
+                      {clip.text}
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                      <button 
+                        className="btn-secondary"
+                        style={{ padding: '2px 8px', fontSize: '0.75rem' }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleExport(clip);
+                        }}
+                      >
+                        ⚡ Export
+                      </button>
+                      <button 
+                        className="btn-secondary"
+                        style={{ padding: '2px 6px', fontSize: '0.75rem', borderColor: 'rgba(239, 68, 68, 0.4)', color: '#ef4444' }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteClip(clip.id);
+                        }}
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
           
@@ -657,3 +921,4 @@ export default function EditorPage() {
     </div>
   );
 }
+
