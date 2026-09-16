@@ -13,6 +13,41 @@ from app.services.export_service import run_export_pipeline
 from app.schemas.export import ExportClipRequest, TrackingBlock
 from app.core.config import UPLOADS_DIR
 
+# Optional: Paste your raw YouTube Cookie string here if YouTube requires authentication on Colab
+COLAB_YOUTUBE_COOKIE = os.environ.get("YOUTUBE_COOKIE", None)
+
+def download_video_for_colab(youtube_url: str):
+    """Independent Colab video downloader supporting custom Cookie headers."""
+    import uuid
+    import yt_dlp
+    from app.core.config import UPLOADS_DIR, FFMPEG_PATH
+    
+    unique_id = str(uuid.uuid4())
+    output_template = str(UPLOADS_DIR / f"{unique_id}.%(ext)s")
+    
+    opts = {
+        "outtmpl": output_template,
+        "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+        "merge_output_format": "mp4",
+        "ffmpeg_location": FFMPEG_PATH,
+        "noplaylist": True,
+        "quiet": True,
+        "no_warnings": True,
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["android", "ios", "m3u8"]
+            }
+        }
+    }
+    
+    if COLAB_YOUTUBE_COOKIE:
+        opts["http_headers"] = {"Cookie": COLAB_YOUTUBE_COOKIE}
+        
+    with yt_dlp.YoutubeDL(opts) as ydl:
+        info = ydl.extract_info(youtube_url, download=True)
+        ext = info.get("ext") or "mp4"
+        return f"{unique_id}.{ext}"
+
 def run_colab_showcase():
     print("==================================================")
     print("🚀 STARTING COLAB GPU SHOWCASE PIPELINE 🚀")
@@ -26,8 +61,7 @@ def run_colab_showcase():
     
     print(f"\n[1/4] Downloading Video: {youtube_url}")
     try:
-        video_info = download_youtube_video(youtube_url)
-        saved_filename = video_info.saved_filename if hasattr(video_info, "saved_filename") else video_info["saved_filename"]
+        saved_filename = download_video_for_colab(youtube_url)
         video_path = UPLOADS_DIR / saved_filename
         print(f"✅ Downloaded YouTube Video to {video_path}")
     except Exception as e:

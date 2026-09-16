@@ -104,19 +104,13 @@ def download_from_youtube(raw_youtube_url_string: str) -> YouTubeDownloadRespons
             "quiet": True,
             "no_warnings": True,
 
-            # 7. 'extractor_args': Emulates mobile clients (Android/iOS) to bypass YouTube datacenter bot blocks on Colab & cloud servers
+            # 7. 'extractor_args': Emulates mobile clients (Android/iOS) for standard client format selection
             "extractor_args": {
                 "youtube": {
                     "player_client": ["android", "ios", "m3u8"]
                 }
             },
         }
-
-        # 8. Optional cookies.txt support for authenticated YouTube downloads
-        from app.core.config import BACKEND_DIR
-        cookie_file_path = BACKEND_DIR / "cookies.txt"
-        if cookie_file_path.exists():
-            youtube_dlp_configuration_options["cookiefile"] = str(cookie_file_path)
 
         # -------------------------------------------------------------------------
         # STEP 5: Execute Download and Extract Metadata (With Client Fallback Loop)
