@@ -1,8 +1,37 @@
 """
-Video Ingestion Router
+VIDEO INGESTION ROUTER
 ======================
-Exposes API endpoints for receiving source videos either directly from user file uploads
-or by fetching and converting streams from YouTube via yt-dlp.
+
+OVERVIEW & ARCHITECTURE:
+This module handles all external media entering the system (Milestone 2). Following the Single 
+Responsibility Principle, it isolates the HTTP layer from the actual downloading and file I/O logic. 
+The heavy lifting is delegated to `upload_service.py` (chunked disk writing) and `youtube_service.py` 
+(yt-dlp subprocessing).
+
+DETAILED SEQUENCE OF EVENTS:
+1. Direct Uploads (`POST /api/upload`):
+   a. Client sends a multipart binary file.
+   b. Router triggers `save_uploaded_video` in `upload_service.py`.
+   c. The file is assigned a collision-resistant UUID (e.g. `1234-5678_original.mp4`).
+   d. The file is streamed to `storage/uploads/` in chunks to prevent RAM exhaustion.
+   e. The frontend receives the generated UUID to use in all future AI endpoints.
+
+2. YouTube Ingestion (`POST /api/download-youtube`):
+   a. Client sends a YouTube URL string.
+   b. Router triggers `download_from_youtube` in `youtube_service.py`.
+   c. A python subprocess runs `yt-dlp` to fetch the highest quality stream.
+   d. The stream is packaged into an MP4 and saved to `storage/uploads/`.
+   e. The frontend receives the UUID.
+
+3. Session Recovery (`GET /api/video/{uuid}`):
+   a. If a user refreshes their browser, the React UI pings this endpoint.
+   b. The router checks if the file still exists in the local filesystem.
+   c. If true, the session is recovered.
+
+SWAGGER USE CASES:
+- Use `/upload` for raw .mp4, .mov, .webm files from disk.
+- Use `/download-youtube` for scraping public web video content.
+- Use `/video/{uuid}` to reconstruct frontend UI state without re-uploading.
 """
 
 from fastapi import APIRouter, UploadFile, File, status
@@ -12,6 +41,10 @@ from app.schemas.video import (
     YouTubeDownloadResponse,
     ErrorResponse,
 )
+from app.services.upload_service import save_uploaded_video
+from app.services.youtube_service import download_from_youtube
+from app.core.config import UPLOADS_DIR
+from fastapi import HTTPException
 from app.services.upload_service import save_uploaded_video
 from app.services.youtube_service import download_from_youtube
 
@@ -87,3 +120,32 @@ Fetches and downloads a public YouTube video to the server's local storage:
 )
 def youtube_download_endpoint(payload: YouTubeDownloadRequest):
     return download_from_youtube(payload.url)
+
+
+@router.get(
+    "/video/{saved_filename}",
+    response_model=VideoUploadResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get Video Metadata (Refresh Recovery)",
+    description="""
+### 🔄 Session Recovery Endpoint
+When a user refreshes the page, the frontend pings this endpoint with the video's UUID to verify if the file still safely exists in the backend storage. 
+Returns the original filename and stream URL so the UI can instantly recover its state without re-uploading.
+""",
+)
+def get_video_status_endpoint(saved_filename: str):
+    """Verifies if a video file exists in storage and returns its metadata for the frontend to render."""
+    video_path = UPLOADS_DIR / saved_filename
+    if not video_path.exists():
+        raise HTTPException(status_code=404, detail="Video not found in storage")
+        
+    # Extract original name (e.g. "uuid_original.mp4" -> "original.mp4")
+    parts = saved_filename.split("_", 1)
+    original_name = parts[1] if len(parts) > 1 else saved_filename
+    
+    return {
+        "original_filename": original_name,
+        "saved_filename": saved_filename,
+        "stream_url": f"/storage/uploads/{saved_filename}",
+        "message": "Video found in storage."
+    }

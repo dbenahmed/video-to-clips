@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { runAiPipeline, getPipelineProgress } from '../services/pipelineApi';
+import { runAiPipeline, getPipelineProgress, cancelPipeline } from '../services/pipelineApi';
 
 export default function PipelineOptionsPage() {
   const { savedFilename } = useParams();
@@ -27,6 +27,26 @@ export default function PipelineOptionsPage() {
     target_frames_per_second: 1,
     pixel_movement_threshold: 50
   });
+
+  // Check background tasks cache on mount (Refresh Recovery)
+  useEffect(() => {
+    const checkExistingJob = async () => {
+      try {
+        const data = await getPipelineProgress(savedFilename);
+        // If the task exists in the backend cache and is actively crunching
+        if (data && data.step !== 'waiting' && data.step !== 'completed' && data.step !== 'error') {
+          setProgressData(data);
+          setIsProcessing(true); // Instantly snap UI back to Loading View
+        } else if (data && data.step === 'completed' && data.result) {
+          // If the user refreshes after it finished, we can just show them the results instantly!
+          setResults(data.result);
+        }
+      } catch (err) {
+        console.error("Failed to check existing job status:", err);
+      }
+    };
+    checkExistingJob();
+  }, [savedFilename]);
 
   // Progress Polling Effect
   useEffect(() => {
@@ -67,6 +87,17 @@ export default function PipelineOptionsPage() {
     } catch (err) {
       setError(err.response?.data?.detail || err.message);
       setIsProcessing(false);
+    }
+  };
+
+  const handleCancelPipeline = async () => {
+    try {
+      await cancelPipeline(savedFilename);
+      setIsProcessing(false);
+      setProgressData({ step: 'waiting', progress: 0.0 });
+      if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
+    } catch (err) {
+      console.error("Failed to cancel job", err);
     }
   };
 
@@ -146,8 +177,38 @@ export default function PipelineOptionsPage() {
             {progressData.progress.toFixed(1)}%
           </p>
 
-          <div style={{ marginTop: '2rem', padding: '1rem', background: 'rgba(255,165,0,0.1)', color: '#ffa500', borderRadius: '8px', display: 'inline-block', border: '1px solid rgba(255,165,0,0.2)' }}>
-            ⚠️ This is running on your local CPU. Please allow several minutes for completion.
+          <div style={{ marginTop: '2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.5rem' }}>
+            <div style={{ 
+              padding: '1rem', borderRadius: '8px', display: 'inline-block', border: '1px solid',
+              ...(progressData.hardware === 'gpu' 
+                  ? { background: 'rgba(0,255,204,0.1)', color: '#00ffcc', borderColor: 'rgba(0,255,204,0.3)' }
+                  : { background: 'rgba(255,165,0,0.1)', color: '#ffa500', borderColor: 'rgba(255,165,0,0.2)' }
+              )}}>
+              {!progressData.hardware ? "🔍 Detecting available hardware..." 
+                : progressData.hardware === 'gpu' 
+                  ? "🚀 Hardware Acceleration ENABLED. Processing with NVIDIA CUDA/GPU."
+                  : "⚠️ Hardware Acceleration UNAVAILABLE. Processing with CPU fallback. Please allow several minutes."
+              }
+            </div>
+
+            <button 
+              onClick={handleCancelPipeline} 
+              style={{
+                background: 'rgba(255, 50, 50, 0.1)',
+                color: '#ff4d4d',
+                border: '1px solid rgba(255, 50, 50, 0.3)',
+                padding: '0.8rem 1.5rem',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '1rem',
+                transition: 'background 0.2s',
+                fontWeight: 'bold'
+              }}
+              onMouseOver={(e) => e.target.style.background = 'rgba(255, 50, 50, 0.2)'}
+              onMouseOut={(e) => e.target.style.background = 'rgba(255, 50, 50, 0.1)'}
+            >
+              🛑 Cancel Analysis
+            </button>
           </div>
           <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
         </div>

@@ -63,8 +63,10 @@ class TrackingBlockResponse(BaseModel):
     """A compressed block of time where the subject remains relatively still."""
     start_time_seconds: float
     end_time_seconds: float
-    center_x_coordinate: int
-    center_y_coordinate: int
+    center_x_coordinate: int = Field(description="The exact center pixel X coordinate of the face.")
+    center_y_coordinate: int = Field(description="The exact center pixel Y coordinate of the face.")
+    crop_x: int = Field(default=0, description="The pre-calculated top-left X coordinate for FFmpeg's 9:16 crop filter. It is clamped to prevent video boundary overflow.")
+    crop_y: int = Field(default=0, description="The pre-calculated top-left Y coordinate for FFmpeg's 9:16 crop filter.")
 
 class PipelineProcessResponse(BaseModel):
     """The final 'Recipe' returned to the frontend when processing completes."""

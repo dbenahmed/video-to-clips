@@ -22,6 +22,7 @@ export default function App() {
         <main className="main-content">
           <Routes>
             <Route path="/" element={<IngestionPage />} />
+            <Route path="/uploaded/:savedFilename" element={<IngestionPage />} />
             <Route path="/pipeline/:savedFilename" element={<PipelineOptionsPage />} />
             <Route path="/editor/:savedFilename" element={<EditorPage />} />
             {/* Future milestones can easily add:

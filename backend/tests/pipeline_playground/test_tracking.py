@@ -40,6 +40,8 @@ class TimeRangeTrackingData:
     end_time_seconds: float
     center_x_coordinate: int
     center_y_coordinate: int
+    crop_x: int = 0
+    crop_y: int = 0
 
 
 @dataclass
@@ -156,13 +158,17 @@ class HybridVideoTracker:
             model_url = "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite"
             urllib.request.urlretrieve(model_url, str(model_path))
 
-        base_options = mp_python.BaseOptions(model_asset_path=str(model_path))
-        
-        # `min_detection_confidence=0.65`: The AI must be at least 65% sure it sees a face. 
-        # If we set this higher (e.g. 0.9), it might ignore blurry faces in fast motion. 
-        # If we set it lower (e.g. 0.1), it might mistake a round lamp for a human face.
-        options = mp_vision.FaceDetectorOptions(base_options=base_options, min_detection_confidence=0.65)
-        self.mediapipe_face_detector = mp_vision.FaceDetector.create_from_options(options)
+        # Attempt to use CUDA/GPU hardware acceleration
+        try:
+            base_options = mp_python.BaseOptions(model_asset_path=str(model_path), delegate=mp_python.BaseOptions.Delegate.GPU)
+            options = mp_vision.FaceDetectorOptions(base_options=base_options, min_detection_confidence=0.65)
+            self.mediapipe_face_detector = mp_vision.FaceDetector.create_from_options(options)
+            print("\n🚀 [TRACKING] Hardware Acceleration ENABLED: Using NVIDIA CUDA/GPU for MediaPipe.")
+        except Exception as e:
+            print("\n⚠️ [TRACKING] Hardware Acceleration UNAVAILABLE: Using CPU fallback for MediaPipe.")
+            base_options = mp_python.BaseOptions(model_asset_path=str(model_path), delegate=mp_python.BaseOptions.Delegate.CPU)
+            options = mp_vision.FaceDetectorOptions(base_options=base_options, min_detection_confidence=0.65)
+            self.mediapipe_face_detector = mp_vision.FaceDetector.create_from_options(options)
         
         # --------------------------------------------------------------------
         # OPENCV FALLBACK CONFIGURATION
@@ -330,6 +336,24 @@ def run_hybrid_tracking_pipeline(target_frames_per_second: int = 1) -> None:
     print("\n[3/4] Compressing Tracking Data...")
     final_compressed_tracking_map = data_compressor.get_final_map()
     print(f"      Compression Result: {len(final_compressed_tracking_map)} total time blocks.")
+
+    # -------------------------------------------------------------------------
+    # NEW STEP: Calculate FFmpeg Crop Coordinates (The "Source of Truth")
+    # -------------------------------------------------------------------------
+    # We pre-calculate the exact top-left (X,Y) coordinates for FFmpeg's crop filter.
+    # We enforce a strict 9:16 aspect ratio and clamp the values so the box never 
+    # overflows the screen boundaries (which would cause FFmpeg errors/black bars).
+    crop_height = video_metadata.video_height_pixels
+    crop_width = int(crop_height * (9 / 16))
+    
+    for block in final_compressed_tracking_map:
+        target_x = block.center_x_coordinate - (crop_width // 2)
+        
+        # Math.max(0, Math.min(max_x, target_x)) equivalent in Python
+        clamped_x = max(0, min(video_metadata.video_width_pixels - crop_width, target_x))
+        
+        block.crop_x = clamped_x
+        block.crop_y = 0  # Assuming vertical crop takes full height natively
 
     print("\n[4/4] Saving Final Recipe JSON...")
     # Create unique output folder

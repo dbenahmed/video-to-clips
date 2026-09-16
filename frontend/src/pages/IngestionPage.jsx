@@ -5,21 +5,39 @@
  * Coordinates between local video uploading and YouTube link fetching.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import FileUploadZone from '../components/FileUploadZone';
 import YouTubeInputZone from '../components/YouTubeInputZone';
 import VideoResultCard from '../components/VideoResultCard';
 
 export default function IngestionPage() {
+  const { savedFilename } = useParams();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('upload'); // 'upload' | 'youtube'
   const [ingestedVideo, setIngestedVideo] = useState(null);
 
+  // Check if a video was already uploaded based on the URL parameter
+  useEffect(() => {
+    if (savedFilename) {
+      axios.get(`http://127.0.0.1:8000/api/video/${savedFilename}`)
+        .then(res => setIngestedVideo(res.data))
+        .catch(err => {
+          console.error("Video not found on server", err);
+          navigate('/'); // Reset URL if invalid
+        });
+    }
+  }, [savedFilename, navigate]);
+
   const handleIngestionSuccess = (videoData) => {
-    setIngestedVideo(videoData);
+    // Instead of just setting state, update the URL so it's refreshable!
+    navigate(`/uploaded/${videoData.saved_filename}`);
   };
 
   const handleReset = () => {
     setIngestedVideo(null);
+    navigate('/');
   };
 
   return (

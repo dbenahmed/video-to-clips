@@ -10,8 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.core.config import STORAGE_DIR, CORS_ORIGINS
-from app.routers.video import router as video_router
-from app.routers.pipeline import router as pipeline_router
+from app.routers import video, pipeline, export
 
 # ==============================================================================
 # OpenAPI Tags Metadata (Shown prominently in Swagger UI at /docs)
@@ -95,8 +94,9 @@ app.mount(
 # ==============================================================================
 # 4. Router Registration
 # ==============================================================================
-app.include_router(video_router)
-app.include_router(pipeline_router)
+app.include_router(video.router)
+app.include_router(pipeline.router)
+app.include_router(export.router, prefix="/api/v1")
 
 
 # ==============================================================================

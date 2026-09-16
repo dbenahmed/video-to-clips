@@ -28,3 +28,13 @@ export async function getPipelineProgress(savedFilename) {
   const response = await apiClient.get(`/api/v1/pipeline/progress/${encodeURIComponent(savedFilename)}`);
   return response.data;
 }
+
+/**
+ * Sends a kill signal to gracefully abort the background AI task.
+ * @param {string} savedFilename - The exact filename on the backend.
+ * @returns {Promise<any>}
+ */
+export async function cancelPipeline(savedFilename) {
+  const response = await apiClient.post(`/api/v1/pipeline/cancel/${encodeURIComponent(savedFilename)}`);
+  return response.data;
+}

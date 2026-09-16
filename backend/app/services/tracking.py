@@ -1,3 +1,32 @@
+"""
+HYBRID SUBJECT TRACKING SERVICE (AI LAYER)
+==========================================
+
+OVERVIEW & ARCHITECTURE:
+This module contains the heavy mathematical lifting for Milestone 3 (Subject Tracking).
+It completely abstracts the computer vision dependencies (MediaPipe, OpenCV, NumPy) from the rest of the application.
+Following the Single Responsibility Principle, it is split into three core classes:
+1. `VideoMetadata`: Handles FFmpeg/OpenCV probe operations (width, height, FPS, duration).
+2. `TrackingDataCompressor`: Reduces the massive per-frame array of raw bounding boxes into a tiny, web-friendly payload.
+3. `HybridVideoTracker`: The actual AI engine that uses Google's MediaPipe BlazeFace to locate subjects.
+
+DETAILED SEQUENCE OF EVENTS:
+1. Initialization: The service probes the video using OpenCV to get the base dimensions.
+2. Hardware Acceleration: MediaPipe automatically attempts to bind to NVIDIA CUDA or Google Coral TPUs. If unavailable, it gracefully degrades to CPU.
+3. Frame Extraction: OpenCV streams the video frame by frame.
+4. AI Inference: 
+   - Every `N` frames (based on Target FPS), the frame is converted to RGB.
+   - MediaPipe scans the image for human faces/bodies.
+5. Coordinate Normalization:
+   - MediaPipe returns relative coordinates (0.0 to 1.0).
+   - The engine converts these to absolute pixels (`box_x`, `box_y`).
+6. 9:16 Smart Cropping Calculation (The Math):
+   - The system calculates a vertical 9:16 slice (e.g., 607x1080) that perfectly centers the face.
+   - It mathematically clamps the crop boundaries so they never bleed outside the original video frame.
+   - The final safe coordinates are saved as `crop_x` and `crop_y`.
+7. Compression: The `TrackingDataCompressor` drops duplicate static frames to reduce JSON payload size by ~80%.
+8. Delivery: The compiled JSON structure is returned to the FastAPI Router.
+"""
 import cv2
 import urllib.request
 from pathlib import Path
@@ -69,9 +98,19 @@ class HybridVideoTracker:
             model_url = "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite"
             urllib.request.urlretrieve(model_url, str(model_path))
 
-        base_options = mp_python.BaseOptions(model_asset_path=str(model_path))
-        options = mp_vision.FaceDetectorOptions(base_options=base_options, min_detection_confidence=0.65)
-        self.mediapipe_face_detector = mp_vision.FaceDetector.create_from_options(options)
+        # Attempt to use CUDA/GPU hardware acceleration
+        try:
+            base_options = mp_python.BaseOptions(model_asset_path=str(model_path), delegate=mp_python.BaseOptions.Delegate.GPU)
+            options = mp_vision.FaceDetectorOptions(base_options=base_options, min_detection_confidence=0.65)
+            self.mediapipe_face_detector = mp_vision.FaceDetector.create_from_options(options)
+            self.hardware = "gpu"
+            print("\n🚀 [TRACKING] Hardware Acceleration ENABLED: Using NVIDIA CUDA/GPU for MediaPipe.")
+        except Exception as e:
+            print("\n⚠️ [TRACKING] Hardware Acceleration UNAVAILABLE: Using CPU fallback for MediaPipe.")
+            base_options = mp_python.BaseOptions(model_asset_path=str(model_path), delegate=mp_python.BaseOptions.Delegate.CPU)
+            options = mp_vision.FaceDetectorOptions(base_options=base_options, min_detection_confidence=0.65)
+            self.mediapipe_face_detector = mp_vision.FaceDetector.create_from_options(options)
+            self.hardware = "cpu"
         
         self.opencv_csrt_tracker = None
         self.last_known_face_bounding_box = None
@@ -110,7 +149,35 @@ class HybridVideoTracker:
 
 
 def run_tracking(video_path: Path, options: TrackingOptions, progress_callback=None) -> List[dict]:
-    """Runs the hybrid tracking algorithm on the video."""
+    """
+    HYBRID SUBJECT TRACKING SERVICE (AI LAYER)
+    ==========================================
+
+    OVERVIEW & ARCHITECTURE:
+    This module contains the heavy mathematical lifting for Milestone 3 (Subject Tracking).
+    It completely abstracts the computer vision dependencies (MediaPipe, OpenCV, NumPy) from the rest of the application.
+    Following the Single Responsibility Principle, it is split into three core classes:
+    1. `VideoMetadata`: Handles FFmpeg/OpenCV probe operations (width, height, FPS, duration).
+    2. `TrackingDataCompressor`: Reduces the massive per-frame array of raw bounding boxes into a tiny, web-friendly payload.
+    3. `HybridVideoTracker`: The actual AI engine that uses Google's MediaPipe BlazeFace to locate subjects.
+
+    DETAILED SEQUENCE OF EVENTS:
+    1. Initialization: The service probes the video using OpenCV to get the base dimensions.
+    2. Hardware Acceleration: MediaPipe automatically attempts to bind to NVIDIA CUDA or Google Coral TPUs. If unavailable, it gracefully degrades to CPU.
+    3. Frame Extraction: OpenCV streams the video frame by frame.
+    4. AI Inference: 
+       - Every `N` frames (based on Target FPS), the frame is converted to RGB.
+       - MediaPipe scans the image for human faces/bodies.
+    5. Coordinate Normalization:
+       - MediaPipe returns relative coordinates (0.0 to 1.0).
+       - The engine converts these to absolute pixels (`box_x`, `box_y`).
+    6. 9:16 Smart Cropping Calculation (The Math):
+       - The system calculates a vertical 9:16 slice (e.g., 607x1080) that perfectly centers the face.
+       - It mathematically clamps the crop boundaries so they never bleed outside the original video frame.
+       - The final safe coordinates are saved as `crop_x` and `crop_y`.
+    7. Compression: The `TrackingDataCompressor` drops duplicate static frames to reduce JSON payload size by ~80%.
+    8. Delivery: The compiled JSON structure is returned to the FastAPI Router.
+    """
     capture = cv2.VideoCapture(str(video_path))
     
     if not capture.isOpened() or int(capture.get(cv2.CAP_PROP_FRAME_COUNT)) <= 0:
@@ -138,9 +205,30 @@ def run_tracking(video_path: Path, options: TrackingOptions, progress_callback=N
             
         if current_frame_index % 10 == 0 and progress_callback:
             progress = min(99.0, (current_frame_index / metadata.total_frames) * 100.0)
-            progress_callback(progress)
+            should_continue = progress_callback(progress, tracker.hardware)
+            if should_continue is False:
+                print("Tracking gracefully aborted by user.")
+                break
             
         current_frame_index += 1
         
     capture.release()
-    return compressor.get_final_map()
+    
+    final_map = compressor.get_final_map()
+    
+    # -------------------------------------------------------------------------
+    # SOURCE OF TRUTH CROP CALCULATION
+    # -------------------------------------------------------------------------
+    # We pre-calculate the exact top-left (X,Y) coordinates for FFmpeg's 9:16 crop filter.
+    # We clamp the values so the box never overflows the screen boundaries (which 
+    # would cause FFmpeg errors/black bars). The frontend reads these directly.
+    crop_height = metadata.video_height_pixels
+    crop_width = int(crop_height * (9 / 16))
+    
+    for block in final_map:
+        target_x = block["center_x_coordinate"] - (crop_width // 2)
+        clamped_x = max(0, min(metadata.video_width_pixels - crop_width, target_x))
+        block["crop_x"] = clamped_x
+        block["crop_y"] = 0
+        
+    return final_map

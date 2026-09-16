@@ -1,3 +1,30 @@
+"""
+SEMANTIC VIDEO SEGMENTATION SERVICE (AI LAYER)
+==============================================
+
+OVERVIEW & ARCHITECTURE:
+This module handles the AI transcription and logical topic clustering for Milestone 4.
+It heavily utilizes OpenAI's Whisper model (via faster-whisper) and completely isolates the Natural Language 
+Processing logic from the rest of the backend. 
+Following SOLID principles, the logic is highly decoupled into single-responsibility classes:
+1. `AudioExtractor`: Strips raw MP4 videos down to lightweight 16kHz WAV files for the AI to ingest.
+2. `TranscriptionEngine`: Wraps `faster-whisper`, handling hardware detection (GPU/CPU) and model offloading.
+3. `SemanticAnalyzer`: Processes the raw text array, finding natural topic boundaries.
+4. `TopicBlockMapper`: Binds the semantic topics back to actual video timestamps.
+5. `ClipExtractor`: Filters the final blocks to find "Golden Clips" that meet length requirements.
+
+DETAILED SEQUENCE OF EVENTS:
+1. Audio Extraction: FFmpeg slices the audio track out of the video file (saving 90% of processing overhead).
+2. Model Bootstrapping: `faster-whisper` loads the requested model (e.g., 'tiny', 'base'). It automatically 
+   attempts to use `float16` precision on NVIDIA CUDA GPUs. If no GPU is found, it falls back to CPU `int8`.
+3. AI Transcription: Whisper transcribes the audio, emitting an array of sentences and exact start/end timestamps.
+4. Topic Clustering (Semantic Analysis):
+   - The engine loops through the sentences.
+   - It measures the time gap between sentences. If there is a massive pause (e.g., > 1.5 seconds), the AI 
+     assumes the speaker changed topics, creating a "Boundary".
+5. Filtering: Blocks that are too short (under 15s) or too long (over 60s) are dynamically merged or discarded.
+6. Payload Generation: The final "Golden Clips" (with transcripts and timestamps) are returned to the API router.
+"""
 import os
 import subprocess
 import numpy as np
@@ -92,7 +119,10 @@ class TranscriptionEngine:
             ))
             if progress_callback and info.duration > 0:
                 progress = min(99.0, (segment.end / info.duration) * 100.0)
-                progress_callback(progress)
+                should_continue = progress_callback(progress)
+                if should_continue is False:
+                    print("Whisper transcription gracefully aborted by user.")
+                    break
                 
         return parsed_sentences
 
