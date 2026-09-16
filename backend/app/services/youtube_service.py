@@ -112,6 +112,12 @@ def download_from_youtube(raw_youtube_url_string: str) -> YouTubeDownloadRespons
             },
         }
 
+        # 8. Optional cookies.txt support for authenticated YouTube downloads
+        from app.core.config import BACKEND_DIR
+        cookie_file_path = BACKEND_DIR / "cookies.txt"
+        if cookie_file_path.exists():
+            youtube_dlp_configuration_options["cookiefile"] = str(cookie_file_path)
+
         # -------------------------------------------------------------------------
         # STEP 5: Execute Download and Extract Metadata (With Client Fallback Loop)
         # -------------------------------------------------------------------------

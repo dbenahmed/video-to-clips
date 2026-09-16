@@ -25,10 +25,21 @@ def run_colab_showcase():
     # ---------------------------------------------------------
     
     print(f"\n[1/4] Downloading Video: {youtube_url}")
-    video_info = download_youtube_video(youtube_url)
-    saved_filename = video_info.saved_filename if hasattr(video_info, "saved_filename") else video_info["saved_filename"]
-    video_path = UPLOADS_DIR / saved_filename
-    print(f"✅ Downloaded to {video_path}")
+    try:
+        video_info = download_youtube_video(youtube_url)
+        saved_filename = video_info.saved_filename if hasattr(video_info, "saved_filename") else video_info["saved_filename"]
+        video_path = UPLOADS_DIR / saved_filename
+        print(f"✅ Downloaded YouTube Video to {video_path}")
+    except Exception as e:
+        print(f"⚠️ YouTube blocked direct download on Colab IP: {e}")
+        print("🔄 Using direct fallback sample MP4 video to run the AI showcase pipeline...")
+        import urllib.request
+        fallback_url = "https://github.com/intel-iot-devkit/sample-videos/raw/master/head-pose-face-detection-female-and-male.mp4"
+        saved_filename = "colab_fallback_sample.mp4"
+        video_path = UPLOADS_DIR / saved_filename
+        if not video_path.exists():
+            urllib.request.urlretrieve(fallback_url, video_path)
+        print(f"✅ Fallback sample video ready at {video_path}")
     
     print("\n[2/4] Running AI Segmentation (Whisper GPU)...")
     # Using 'small' model because the Colab GPU can handle it easily for high accuracy!
