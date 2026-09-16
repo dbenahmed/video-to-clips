@@ -20,7 +20,7 @@ export default function PipelineOptionsPage() {
     similarity_drop_threshold: 0.2,
     min_clip_duration_seconds: 30.0,
     max_clip_duration_seconds: 60.0,
-    whisper_model_size: 'base'
+    whisper_model_size: 'tiny' // Default to tiny for fastest CPU evaluation
   });
 
   const [trackOptions, setTrackOptions] = useState({
@@ -130,12 +130,15 @@ export default function PipelineOptionsPage() {
               ))
             )}
           </div>
-          <div style={{ marginTop: '2rem', display: 'flex', gap: '1rem' }}>
+          <div style={{ marginTop: '2rem', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
             <button className="btn-primary" onClick={() => navigate(`/editor/${encodeURIComponent(savedFilename)}`)}>
               Proceed to Video Editor 🎬
             </button>
-            <button className="btn-secondary" onClick={() => navigate('/')}>
-              Start Over
+            <button className="btn-secondary" onClick={() => setResults(null)}>
+              ⚙️ Tweak Settings & Re-run
+            </button>
+            <button className="btn-secondary" onClick={() => navigate('/')} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.2)' }}>
+              Upload New Video
             </button>
           </div>
         </div>
@@ -273,6 +276,7 @@ export default function PipelineOptionsPage() {
                 <option value="small">Small</option>
                 <option value="medium">Medium</option>
               </select>
+              <small style={{ color: '#888', display: 'block', marginTop: '0.5rem' }}>For better results, use the <strong>Base</strong> model, but note that it takes significantly more processing time on a CPU.</small>
             </div>
           </div>
 

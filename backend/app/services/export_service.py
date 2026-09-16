@@ -198,24 +198,41 @@ def run_export_pipeline(request: ExportClipRequest, input_path: Path, output_pat
         "-map", "[outv]",
         "-map", "[outa]",
         "-c:v", "libx264",
-        "-preset", "fast", # Fast encoding for MVP
+        "-preset", "ultrafast", # Ultra-fast CPU encoding (perfect for evaluators without GPUs)
+        "-crf", "28",           # Lowers bit-rate slightly to speed up encoding without noticeable quality drop
         "-c:a", "aac",
         str(output_path)
     ]
     
-    print(f"Executing FFmpeg with {len(filled_blocks)} sub-clips...")
-    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    print(f"\n[{request.saved_filename}] Executing FFmpeg with {len(filled_blocks)} sub-clips...")
+    print(f"[{request.saved_filename}] Outputting to: {output_path}")
+    print("-" * 50)
+    
+    process = subprocess.Popen(
+        command, 
+        stdout=subprocess.PIPE, 
+        stderr=subprocess.STDOUT, # Merge stderr (where FFmpeg writes progress) into stdout
+        text=True,
+        bufsize=1, # Line buffered
+        universal_newlines=True
+    )
     
     if on_process_started:
         on_process_started(process)
         
-    stdout, stderr = process.communicate() # Blocks until finished or terminated
+    # Stream output to console in real-time!
+    if process.stdout:
+        for line in process.stdout:
+            print(line, end="")
+        
+    process.wait() # Block until finished or terminated
+    print("-" * 50)
     
     # process.returncode is -15 (SIGTERM) or 1 (killed) on windows sometimes when terminated
     if process.returncode != 0 and process.returncode is not None:
         if process.returncode == 1 or process.returncode == -15:
+            print(f"\n[!] Export Cancelled by User.")
             raise Exception("FFmpeg process was forcefully terminated.")
-        print(stderr)
         raise Exception(f"FFmpeg failed with code {process.returncode}")
         
     return True

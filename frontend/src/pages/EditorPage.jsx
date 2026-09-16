@@ -54,24 +54,19 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getFullVideoUrl } from '../services/videoApi';
-import mockRecipe from '../mock_recipe.json';
-
-// Mock data to work on the UI without relying on the backend
-const MOCK_CLIPS = [
-  { id: 'clip_1', start_time: 15.0, end_time: 45.0, text: "This is the most incredible thing I've ever seen...", title: "Viral Hook 1" },
-  { id: 'clip_2', start_time: 60.5, end_time: 90.0, text: "If you want to succeed, you have to stop doing this.", title: "Advice Segment" },
-  { id: 'clip_3', start_time: 120.0, end_time: 155.0, text: "And that's why the market is crashing right now.", title: "Market Analysis" }
-];
 
 export default function EditorPage() {
   const { savedFilename } = useParams();
   const navigate = useNavigate();
   const videoRef = useRef(null);
   
-  const [activeClipId, setActiveClipId] = useState(MOCK_CLIPS[0].id);
-  const [clips, setClips] = useState(MOCK_CLIPS);
+  const [isLoading, setIsLoading] = useState(true);
+  const [videoError, setVideoError] = useState(false);
   
-  const activeClip = clips.find(c => c.id === activeClipId);
+  const [activeClipId, setActiveClipId] = useState(null);
+  const [clips, setClips] = useState([]);
+  
+  const activeClip = clips.find(c => c.id === activeClipId) || clips[0];
 
   // Timeline Drag-to-Scroll State
   const timelineRef = useRef(null);
@@ -97,12 +92,54 @@ export default function EditorPage() {
     exportJobsRef.current = exportJobs;
   }, [exportJobs]);
 
-  // Load the real AI tracking data directly from the generated recipe file
+  // Fetch the real AI tracking data and clips from the backend
   useEffect(() => {
-    if (mockRecipe && mockRecipe.global_tracking) {
-      setTrackingData(mockRecipe.global_tracking);
+    async function fetchRecipe() {
+      try {
+        const response = await fetch(`http://localhost:8000/api/v1/pipeline/recipe/${encodeURIComponent(savedFilename)}`);
+        if (response.status === 404) {
+          // Video hasn't been processed yet, redirect to pipeline page
+          navigate(`/pipeline/${savedFilename}`);
+          return;
+        }
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch recipe');
+        }
+        
+        const data = await response.json();
+        
+        if (data.global_tracking) {
+          setTrackingData(data.global_tracking);
+        }
+        
+        if (data.extracted_clips && data.extracted_clips.length > 0) {
+          // Format clips
+          const formattedClips = data.extracted_clips.map((c, i) => ({
+            id: `clip_${i}`,
+            start_time: c.start_time,
+            end_time: c.end_time,
+            title: c.title || `Clip ${i+1}`,
+            text: c.transcript || "No transcript available"
+          }));
+          setClips(formattedClips);
+          setActiveClipId(formattedClips[0].id);
+        } else {
+          // Fallback if no clips found but tracking exists
+          const defaultClip = { id: 'clip_1', start_time: 0, end_time: 30, text: "Default clip", title: "Clip 1" };
+          setClips([defaultClip]);
+          setActiveClipId('clip_1');
+        }
+        
+        setIsLoading(false);
+      } catch (err) {
+        console.error("Error fetching recipe:", err);
+        setIsLoading(false);
+      }
     }
-  }, []);
+    
+    fetchRecipe();
+  }, [savedFilename, navigate]);
 
   // Global Polling Effect for all active Export Jobs
   useEffect(() => {
@@ -286,13 +323,46 @@ export default function EditorPage() {
     setExportJobs(prev => ({ ...prev, [exportId]: { ...prev[exportId], status: 'cancelling' } }));
     
     try {
-      await fetch(`http://localhost:8000/api/v1/export/cancel/${exportId}`, { method: 'POST' });
-      // The polling loop will catch the 'cancelled' status on the next tick
+      const res = await fetch(`http://localhost:8000/api/v1/export/cancel/${exportId}`, { method: 'POST' });
+      
+      if (res.ok) {
+        alert("Export cancelled successfully! Server CPU has been freed.");
+      } else {
+        const errData = await res.json();
+        alert(`Warning: Failed to cancel export. Server said: ${errData.detail}`);
+      }
+      // The polling loop will ultimately catch the 'cancelled' status and update the UI
     } catch (err) {
       console.error("Failed to cancel export", err);
-      alert("Failed to cancel export job.");
+      alert("Failed to cancel export job due to network error.");
     }
   };
+
+  if (isLoading) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh', flexDirection: 'column', gap: '1rem' }}>
+        <style>{`
+          @keyframes spin { 100% { transform: rotate(360deg); } }
+        `}</style>
+        <div style={{ width: '40px', height: '40px', border: '4px solid rgba(0, 255, 204, 0.3)', borderTop: '4px solid #00ffcc', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+        <h3 style={{ color: '#00ffcc' }}>Loading AI Tracking Data...</h3>
+      </div>
+    );
+  }
+
+  if (videoError) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh', flexDirection: 'column', gap: '1rem' }}>
+        <h2 style={{ color: '#ef4444' }}>⚠️ Video Not Found</h2>
+        <p style={{ color: '#aaa', maxWidth: '400px', textAlign: 'center' }}>
+          The video file could not be loaded from storage. It may have expired or been deleted.
+        </p>
+        <button className="btn-primary" onClick={() => navigate('/')} style={{ marginTop: '1rem' }}>
+          Back to Home
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="editor-page-root" style={{ padding: '2rem 3rem', minHeight: 'calc(100vh - 80px)', display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }}>
@@ -375,8 +445,9 @@ export default function EditorPage() {
           <div style={{ position: 'relative', width: '100%', backgroundColor: '#050505', borderRadius: '12px', overflow: 'hidden', display: 'inline-block' }}>
             <video 
               ref={videoRef}
-              src={getFullVideoUrl(`/storage/uploads/${savedFilename}`)}
+              src={getFullVideoUrl(`/storage/uploads/${encodeURIComponent(savedFilename)}`)}
               controls
+              onError={() => setVideoError(true)}
               onTimeUpdate={handleTimeUpdate}
               onLoadedMetadata={handleLoadedMetadata}
               style={{ width: '100%', maxHeight: '60vh', display: 'block' }}
@@ -533,7 +604,27 @@ export default function EditorPage() {
 
           {/* Clips List */}
           <div className="glass-panel" style={{ padding: '1.5rem', flex: 1, overflowY: 'auto' }}>
-            <h3 style={{ color: '#fff', marginBottom: '1rem', fontSize: '1.1rem' }}>Generated Clips</h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h3 style={{ color: '#fff', margin: 0, fontSize: '1.1rem' }}>Clips</h3>
+              <button 
+                className="btn-secondary" 
+                style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}
+                onClick={() => {
+                  const newClipId = `clip_${Date.now()}`;
+                  const newClip = {
+                    id: newClipId,
+                    start_time: currentVideoTime,
+                    end_time: Math.min(currentVideoTime + 30, videoDuration || currentVideoTime + 30),
+                    title: `Custom Clip ${clips.length + 1}`,
+                    text: "Manually created clip."
+                  };
+                  setClips([...clips, newClip]);
+                  setActiveClipId(newClipId);
+                }}
+              >
+                + Add Clip
+              </button>
+            </div>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
               {clips.map(clip => (

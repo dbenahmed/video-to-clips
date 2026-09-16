@@ -68,7 +68,22 @@ pipeline_jobs_cache: Dict[str, Any] = {}
     description="Poll this endpoint every few seconds to retrieve the live status of the background AI processing job (tracking & segmentation).",
 )
 def get_pipeline_progress(saved_filename: str):
-    return pipeline_jobs_cache.get(saved_filename, {"step": "waiting", "progress": 0.0})
+    job = pipeline_jobs_cache.get(saved_filename)
+    if job:
+        return job
+        
+    # Recovery mechanism: If the server restarted, check if it's already finished on disk!
+    import json
+    recipe_path = UPLOADS_DIR / f"{saved_filename}_recipe.json"
+    if recipe_path.exists():
+        try:
+            with open(recipe_path, "r") as f:
+                result = json.load(f)
+            return {"step": "completed", "progress": 100.0, "result": result}
+        except Exception:
+            pass
+            
+    return {"step": "waiting", "progress": 0.0}
 
 def execute_pipeline_task(request: PipelineProcessRequest, video_path: Path):
     """Background worker function that runs the heavy AI computations safely."""
@@ -100,6 +115,8 @@ def execute_pipeline_task(request: PipelineProcessRequest, video_path: Path):
             
         update_progress("completed", 100.0)
         
+        import json
+        
         # 3. Compile and Store the "Recipe" directly in memory for the frontend to fetch
         response_model = PipelineProcessResponse(
             video_id=request.saved_filename,
@@ -107,7 +124,15 @@ def execute_pipeline_task(request: PipelineProcessRequest, video_path: Path):
             global_tracking=tracking_data,
             extracted_clips=extracted_clips
         )
-        pipeline_jobs_cache[request.saved_filename]["result"] = response_model.model_dump()
+        
+        result_dict = response_model.model_dump()
+        pipeline_jobs_cache[request.saved_filename]["result"] = result_dict
+        
+        # Save to disk to persist across server restarts
+        recipe_path = UPLOADS_DIR / f"{request.saved_filename}_recipe.json"
+        with open(recipe_path, "w") as f:
+            json.dump(result_dict, f)
+
         
     except Exception as e:
         print(f"Pipeline Error: {e}")
@@ -165,3 +190,28 @@ def cancel_pipeline(saved_filename: str):
         else:
             return {"status": "ignored", "message": "Job is not actively running."}
     raise HTTPException(status_code=404, detail="No active job found for this video.")
+
+import json
+
+@router.get(
+    "/recipe/{saved_filename}",
+    summary="Get Final AI Recipe",
+    description="Fetches the persisted AI tracking and segmentation data for a video.",
+)
+def get_pipeline_recipe(saved_filename: str):
+    recipe_path = UPLOADS_DIR / f"{saved_filename}_recipe.json"
+    
+    # Check if we have it on disk
+    if recipe_path.exists():
+        try:
+            with open(recipe_path, "r") as f:
+                return json.load(f)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to read recipe file: {e}")
+            
+    # Check memory cache as fallback
+    job = pipeline_jobs_cache.get(saved_filename)
+    if job and "result" in job:
+        return job["result"]
+        
+    raise HTTPException(status_code=404, detail="Recipe not found. The AI pipeline has not processed this video yet.")

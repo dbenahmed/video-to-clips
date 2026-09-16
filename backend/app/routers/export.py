@@ -12,11 +12,12 @@ from fastapi import APIRouter, HTTPException, BackgroundTasks
 from fastapi.responses import FileResponse
 from app.schemas.export import ExportClipRequest
 from app.services.export_service import run_export_pipeline
+from app.core.config import STORAGE_DIR, UPLOADS_DIR
 
 router = APIRouter(prefix="/export", tags=["Export"])
 
-STORAGE_UPLOADS_DIR = Path("storage/uploads")
-STORAGE_EXPORTS_DIR = Path("storage/exports")
+STORAGE_UPLOADS_DIR = UPLOADS_DIR
+STORAGE_EXPORTS_DIR = STORAGE_DIR / "exports"
 
 # Ensure exports directory exists
 STORAGE_EXPORTS_DIR.mkdir(parents=True, exist_ok=True)
