@@ -75,6 +75,7 @@ import os
 import subprocess
 from pathlib import Path
 from app.schemas.export import ExportClipRequest
+from app.core.config import FFMPEG_PATH
 
 def _clamp_tracking_blocks(tracking_data: list, start_time: float, end_time: float) -> list:
     """
@@ -191,7 +192,7 @@ def run_export_pipeline(request: ExportClipRequest, input_path: Path, output_pat
     
     # 4. EXECUTE FFMPEG
     command = [
-        "ffmpeg",
+        FFMPEG_PATH,
         "-y", # Overwrite output if it exists
         "-i", str(input_path),
         "-filter_complex", filter_complex,

@@ -7,6 +7,9 @@ from pydantic import BaseModel, Field
 from typing import List
 from app.schemas.pipeline import TrackingBlockResponse
 
+# Alias for compatibility with colab_showcase and external services
+TrackingBlock = TrackingBlockResponse
+
 class ExportClipRequest(BaseModel):
     """Payload sent by the frontend to trigger a video export."""
     saved_filename: str = Field(..., description="The UUID of the original source video on disk.")
