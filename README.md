@@ -19,6 +19,9 @@ It includes a 1-click boot script for Windows (`start_windows.bat`) and Mac/Linu
 ### Option B: The Developer Setup (For Engineers)
 If you want to manually configure the Python virtual environments and run the servers from the terminal, please read the **[DEVELOPER_GUIDE.md](./DEVELOPER_GUIDE.md)**.
 
+### Option C: The Google Colab Showcase (For evaluating GPU performance)
+If you want to bypass the local web servers entirely and just see the raw AI engine crunch a video using an NVIDIA T4 GPU in minutes, please read the **[COLAB_GUIDE.md](./COLAB_GUIDE.md)**.
+
 ## 📚 Documentation & Architecture
 
 To understand the complex engineering decisions, design patterns, and trade-offs that power this application, please read the **[ARCHITECTURE.md](./ARCHITECTURE.md)** file.

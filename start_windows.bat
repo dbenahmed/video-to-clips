@@ -38,19 +38,22 @@ cd ../frontend
 call npm install
 
 echo [4/4] Starting Application Servers...
+:: Go back to project root
+cd ..
+
 echo Starting Backend AI Engine in a new window...
-start "Video AI Backend" cmd /c "cd ../backend && call venv\Scripts\activate.bat && uvicorn main:app --host 127.0.0.1 --port 8000"
+start "Video AI Backend" cmd /k "cd backend && call venv\Scripts\activate.bat && uvicorn main:app --host 127.0.0.1 --port 8000"
 
 echo Starting Frontend User Interface in a new window...
-start "Video AI Frontend" cmd /c "npm run dev"
+start "Video AI Frontend" cmd /k "cd frontend && npm run dev"
 
 echo.
 echo ========================================================
 echo        SUCCESS! Application is booting up...
 echo ========================================================
-echo The application will open in your web browser shortly.
-echo If it doesn't open automatically, open Google Chrome and go to:
-echo http://localhost:5173
+echo Opening Google Chrome to http://localhost:5173 ...
+timeout /t 3 /nobreak >nul
+start http://localhost:5173
 echo.
 echo ⚠️ IMPORTANT: Do not close the two black terminal windows that just opened!
 echo They are keeping your application running.
