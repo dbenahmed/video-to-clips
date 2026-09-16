@@ -41,6 +41,10 @@ echo [4/4] Starting Application Servers...
 :: Go back to project root
 cd ..
 
+echo Clearing any stale python/node processes on ports 8000 and 5173...
+powershell -Command "Get-NetTCPConnection -LocalPort 8000 -ErrorAction SilentlyContinue | Where-Object { (Get-Process -Id $_.OwningProcess -ErrorAction SilentlyContinue).ProcessName -eq 'python' } | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }" >nul 2>&1
+powershell -Command "Get-NetTCPConnection -LocalPort 5173 -ErrorAction SilentlyContinue | Where-Object { (Get-Process -Id $_.OwningProcess -ErrorAction SilentlyContinue).ProcessName -eq 'node' } | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }" >nul 2>&1
+
 echo Starting Backend AI Engine in a new window...
 start "Video AI Backend" cmd /k "cd backend && call venv\Scripts\activate.bat && uvicorn main:app --host 127.0.0.1 --port 8000"
 

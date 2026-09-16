@@ -34,6 +34,10 @@ cd ../frontend || exit
 npm install
 
 echo "[4/4] Starting Application Servers..."
+echo "Clearing any stale python/node processes on ports 8000 and 5173..."
+lsof -ti:8000 | xargs kill -9 2>/dev/null
+lsof -ti:5173 | xargs kill -9 2>/dev/null
+
 # Start backend in background
 cd ../backend || exit
 echo "Starting Backend Server..."
