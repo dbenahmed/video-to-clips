@@ -6,8 +6,10 @@
 backend/venv/
 backend/.venv/
 backend/storage/
-backend/__pycache__/
-backend/*.pyc
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
 
 # Frontend
 frontend/node_modules/
