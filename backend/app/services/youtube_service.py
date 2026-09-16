@@ -103,6 +103,13 @@ def download_from_youtube(raw_youtube_url_string: str) -> YouTubeDownloadRespons
         # 6. 'quiet' & 'no_warnings': Suppresses noisy terminal progress lines so our server logs stay clean
         "quiet": True,
         "no_warnings": True,
+
+        # 7. 'extractor_args': Emulates mobile clients (Android/iOS) to bypass YouTube datacenter bot blocks on Colab & cloud servers
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["android", "ios", "m3u8"]
+            }
+        },
     }
 
     # -------------------------------------------------------------------------
