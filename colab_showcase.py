@@ -26,7 +26,8 @@ def run_colab_showcase():
     
     print(f"\n[1/4] Downloading Video: {youtube_url}")
     video_info = download_youtube_video(youtube_url)
-    video_path = UPLOADS_DIR / video_info["saved_filename"]
+    saved_filename = video_info.saved_filename if hasattr(video_info, "saved_filename") else video_info["saved_filename"]
+    video_path = UPLOADS_DIR / saved_filename
     print(f"✅ Downloaded to {video_path}")
     
     print("\n[2/4] Running AI Segmentation (Whisper GPU)...")
@@ -56,7 +57,7 @@ def run_colab_showcase():
     print(f"✅ Generated {len(tracking_data)} tracking points.")
     
     print("\n[4/4] Exporting Final Vertical Video...")
-    output_filename = f"SHOWCASE_RESULT_{video_info['saved_filename']}"
+    output_filename = f"SHOWCASE_RESULT_{saved_filename}"
     output_path = UPLOADS_DIR / output_filename
     
     # Format the tracking data to match our API schema
@@ -65,7 +66,7 @@ def run_colab_showcase():
     ]
     
     export_req = ExportClipRequest(
-        saved_filename=video_info["saved_filename"],
+        saved_filename=saved_filename,
         start_time=best_clip["start_time_seconds"],
         end_time=best_clip["end_time_seconds"],
         tracking_data=export_tracking_blocks

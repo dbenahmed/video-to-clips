@@ -170,3 +170,7 @@ def download_from_youtube(raw_youtube_url_string: str) -> YouTubeDownloadRespons
             status_code=500,
             detail=f"Failed to download YouTube video: {str(general_download_operation_error)}"
         )
+
+
+# Backward compatibility function alias
+download_youtube_video = download_from_youtube

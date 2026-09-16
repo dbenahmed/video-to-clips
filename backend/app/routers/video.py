@@ -141,11 +141,15 @@ def get_video_status_endpoint(saved_filename: str):
         
     # Extract original name (e.g. "uuid_original.mp4" -> "original.mp4")
     parts = saved_filename.split("_", 1)
+    video_id = parts[0] if len(parts) > 1 else "unknown-id"
     original_name = parts[1] if len(parts) > 1 else saved_filename
+    size_bytes = video_path.stat().st_size
     
     return {
-        "original_filename": original_name,
+        "status": "success",
+        "id": video_id,
+        "original_name": original_name,
         "saved_filename": saved_filename,
-        "stream_url": f"/storage/uploads/{saved_filename}",
-        "message": "Video found in storage."
+        "url": f"/storage/uploads/{saved_filename}",
+        "size_bytes": size_bytes
     }

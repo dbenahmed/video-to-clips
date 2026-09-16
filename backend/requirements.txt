@@ -14,3 +14,8 @@ typing-extensions==4.16.0
 typing-inspection==0.4.4
 uvicorn==0.53.0
 yt-dlp==2026.8.19
+numpy
+opencv-python
+mediapipe
+faster-whisper
+sentence-transformers
