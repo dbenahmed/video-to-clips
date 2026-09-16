@@ -114,13 +114,13 @@ export default function EditorPage() {
         }
         
         if (data.extracted_clips && data.extracted_clips.length > 0) {
-          // Format clips
+          // Format clips to match React state schema
           const formattedClips = data.extracted_clips.map((c, i) => ({
-            id: `clip_${i}`,
-            start_time: c.start_time,
-            end_time: c.end_time,
-            title: c.title || `Clip ${i+1}`,
-            text: c.transcript || "No transcript available"
+            id: c.clip_id || `clip_${i}`,
+            start_time: c.start_time_seconds,
+            end_time: c.end_time_seconds,
+            title: c.extraction_reasoning || `Clip ${i+1}`,
+            text: c.text_transcript || "No transcript available"
           }));
           setClips(formattedClips);
           setActiveClipId(formattedClips[0].id);
