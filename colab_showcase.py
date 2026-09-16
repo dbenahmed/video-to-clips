@@ -21,7 +21,7 @@ def run_colab_showcase():
     # ---------------------------------------------------------
     # EDIT THIS URL TO YOUR SHOWCASE VIDEO!
     # (A podcast or talking-head video works best)
-    youtube_url = "https://www.youtube.com/watch?v=F0J_P_7_8vU" 
+    youtube_url = "https://youtu.be/_g4l7YkDQwA?si=iW2DPHcNhb47QWbX" 
     # ---------------------------------------------------------
     
     print(f"\n[1/4] Downloading Video: {youtube_url}")
